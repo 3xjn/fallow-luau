@@ -1,6 +1,6 @@
 # Auto-publish GitHub Releases from Cargo.toml version.
-# On every push to main: if tag v$VERSION does not exist yet, build binaries and create the release.
-# Manual: Actions → release → Run workflow
+# On push to main: if no GitHub Release exists for v$VERSION yet, build + publish.
+# Tag pushes and workflow_dispatch also release.
 name: release
 
 on:
@@ -29,11 +29,11 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Resolve version / skip if already released
+      - name: Resolve version / skip if release already published
         id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -47,14 +47,10 @@ jobs:
           [[ "$TAG" == v* ]] || TAG="v${TAG}"
           VERSION="${TAG#v}"
 
-          # Tag pushes always release. Main/dispatch: only if tag is new.
+          # Skip only when a published GitHub Release already exists (a bare tag is not enough).
           SHOULD=true
-          if [[ "${{ github.ref_type }}" != "tag" ]]; then
-            if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-              SHOULD=false
-            elif git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-              SHOULD=false
-            fi
+          if [[ "${{ github.ref_type }}" != "tag" ]] && gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            SHOULD=false
           fi
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -83,9 +79,6 @@ jobs:
             musl: true
           - os: macos-latest
             target: aarch64-apple-darwin
-            archive: tar.gz
-          - os: macos-13
-            target: x86_64-apple-darwin
             archive: tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
@@ -159,6 +152,7 @@ jobs:
           tag_name: ${{ needs.decide.outputs.tag }}
           name: fallow-luau ${{ needs.decide.outputs.tag }}
           generate_release_notes: true
+          make_latest: true
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

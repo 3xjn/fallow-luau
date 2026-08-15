@@ -67,7 +67,6 @@ Download prebuilt binaries from [GitHub Releases](https://github.com/3xjn/fallow
 | Asset | Platform |
 | --- | --- |
 | `fallow-luau-*-aarch64-apple-darwin.tar.gz` | macOS Apple Silicon |
-| `fallow-luau-*-x86_64-apple-darwin.tar.gz` | macOS Intel |
 | `fallow-luau-*-x86_64-unknown-linux-gnu.tar.gz` | Linux x64 (glibc) |
 | `fallow-luau-*-aarch64-unknown-linux-gnu.tar.gz` | Linux ARM64 (glibc) |
 | `fallow-luau-*-x86_64-unknown-linux-musl.tar.gz` | Linux x64 (musl) |
