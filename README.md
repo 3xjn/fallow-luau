@@ -14,4 +14,4 @@ fallow-luau schema
 
 `--explain` puts metric definitions in a `_meta` object on the JSON so you (or an agent) do not need a second lookup.
 
-Right now you get parse + string-literal require graphs, complexity (including nested `local function`), maintainability, SIG unit-size, hotspots, and refactor targets. Dead code, dupes, audit, and MCP are next — see `SPEC.md`. Notes on the scoring live in [`docs/health.md`](docs/health.md).
+Right now: parse + require graphs, health, dead-code, dupes, audit, explain, and MCP. The full Fallow→Luau surface map (done / todo / skip) lives in [`docs/parity.md`](docs/parity.md). Scoring notes in [`docs/health.md`](docs/health.md).

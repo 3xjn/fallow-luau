@@ -32,6 +32,8 @@ pub struct HealthOptions {
     /// Optional injected churn (path → commit unix timestamps) for tests.
     pub churn_override: Option<BTreeMap<String, Vec<i64>>>,
     pub now_unix: Option<i64>,
+    /// When set (from dead-code), overrides per-file dead_code_ratio in MI.
+    pub dead_ratio_override: Option<BTreeMap<String, f64>>,
 }
 
 impl Default for HealthOptions {
@@ -49,6 +51,7 @@ impl Default for HealthOptions {
             min_commits: 1,
             churn_override: None,
             now_unix: None,
+            dead_ratio_override: None,
         }
     }
 }
@@ -255,8 +258,11 @@ pub fn analyze_health(
         let lines = file.lines.max(1);
         let density = total_cc as f64 / lines as f64;
         let (fan_in, fan_out) = fans.get(&file.path).copied().unwrap_or((0, 0));
-        // Dead-code analysis is SPEC step 3; until then dead_ratio is 0.
-        let dead_ratio = 0.0;
+        let dead_ratio = opts
+            .dead_ratio_override
+            .as_ref()
+            .and_then(|m| m.get(&file.path).copied())
+            .unwrap_or(0.0);
         let mi = maintainability_index(density, dead_ratio, fan_out);
 
         let cov = test_reach.get(&file.path).copied().unwrap_or(0.0);

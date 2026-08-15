@@ -66,6 +66,28 @@ pub fn health_meta() -> Value {
 pub fn schema_meta() -> Value {
     json!({
         "docs": "https://docs.fallow.tools/cli/schema",
-        "note": "Capability manifest for fallow-luau. Algorithms port Fallow published formulas to Luau."
+        "note": "Capability manifest for fallow-luau. Algorithms port Fallow published formulas to Luau.",
+        "parity": "docs/parity.md"
+    })
+}
+
+pub fn dead_code_meta() -> Value {
+    json!({
+        "docs": "https://docs.fallow.tools/explanations/dead-code",
+        "parity": "docs/parity.md",
+        "issue_types": {
+            "unused_file": "Unreachable from entry points (init/main + tests; fan-in=0 library roots when no init).",
+            "unused_export": "Returned module-table key never referenced via require binding.",
+            "unused_local": "Local binding never read (nested functions included).",
+            "circular_dependency": "Require-graph SCC with no depth limit."
+        }
+    })
+}
+
+pub fn dupes_meta() -> Value {
+    json!({
+        "docs": "https://docs.fallow.tools/explanations/duplication",
+        "mode": "mild (whitespace-insensitive token match; strings/numbers normalized)",
+        "defaults": { "min_tokens": 30, "min_lines": 5, "min_occurrences": 2 }
     })
 }
