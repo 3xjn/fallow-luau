@@ -1,0 +1,2 @@
+# Placeholders so the package layout is valid in git.
+# Release CI overwrites these with real binaries before npm publish.

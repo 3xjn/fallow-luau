@@ -1,0 +1,8 @@
+services:
+  fallow-luau:
+    image: fallow-luau:local
+    build: ../..
+    working_dir: /workspace
+    volumes:
+      - ${PWD}:/workspace
+    user: "${UID:-1000}:${GID:-1000}"

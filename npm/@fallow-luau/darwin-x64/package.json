@@ -1,0 +1,14 @@
+{
+  "name": "@fallow-luau/darwin-x64",
+  "version": "0.1.0",
+  "description": "fallow-luau binary for macOS Intel",
+  "license": "MIT",
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "files": ["bin/fallow-luau"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/3xjn/fallow-luau.git",
+    "directory": "npm/@fallow-luau/darwin-x64"
+  }
+}

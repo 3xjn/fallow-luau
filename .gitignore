@@ -1,1 +1,6 @@
 /target
+npm/fallow-luau/vendor/
+npm/@fallow-luau/*/bin/fallow-luau
+npm/@fallow-luau/*/bin/fallow-luau.exe
+*.tar.gz
+*.zip

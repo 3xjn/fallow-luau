@@ -4,8 +4,15 @@ version = "0.1.0"
 edition = "2021"
 description = "Fallow-shaped codebase intelligence for Luau"
 license = "MIT"
-publish = false
 readme = "README.md"
+repository = "https://github.com/3xjn/fallow-luau"
+homepage = "https://github.com/3xjn/fallow-luau"
+documentation = "https://github.com/3xjn/fallow-luau#readme"
+keywords = ["luau", "fallow", "complexity", "dead-code", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+# Publish to crates.io when ready: `cargo publish`
+# Until then: `cargo install --git https://github.com/3xjn/fallow-luau`
+publish = false
 
 [[bin]]
 name = "fallow-luau"
