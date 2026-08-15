@@ -1,0 +1,43 @@
+{
+  "name": "fallow-luau",
+  "version": "0.1.0",
+  "description": "Fallow-shaped codebase intelligence for Luau",
+  "license": "MIT",
+  "homepage": "https://github.com/3xjn/fallow-luau#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/3xjn/fallow-luau.git"
+  },
+  "bugs": {
+    "url": "https://github.com/3xjn/fallow-luau/issues"
+  },
+  "keywords": [
+    "luau",
+    "fallow",
+    "complexity",
+    "dead-code",
+    "cli",
+    "roblox"
+  ],
+  "bin": {
+    "fallow-luau": "bin/fallow-luau.js"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "optionalDependencies": {
+    "@fallow-luau/darwin-arm64": "0.1.0",
+    "@fallow-luau/darwin-x64": "0.1.0",
+    "@fallow-luau/linux-arm64": "0.1.0",
+    "@fallow-luau/linux-x64": "0.1.0",
+    "@fallow-luau/win32-x64": "0.1.0"
+  }
+}

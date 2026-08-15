@@ -10,7 +10,11 @@ use fallow_luau::{
 };
 
 #[derive(Parser)]
-#[command(name = "fallow-luau", about = "Fallow-shaped codebase intelligence for Luau")]
+#[command(
+    name = "fallow-luau",
+    version,
+    about = "Fallow-shaped codebase intelligence for Luau"
+)]
 struct Cli {
     #[arg(long, global = true, default_value = ".")]
     root: PathBuf,
