@@ -1,0 +1,4 @@
+[env]
+# Debug builds of the AST walk use deep frames; keep tests above the
+# default 2MiB thread stack used by libtest.
+RUST_MIN_STACK = "8388608"
