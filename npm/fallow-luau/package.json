@@ -1,6 +1,6 @@
 {
   "name": "fallow-luau",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Fallow-shaped codebase intelligence for Luau",
   "license": "MIT",
   "homepage": "https://github.com/3xjn/fallow-luau#readme",
@@ -34,10 +34,10 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "optionalDependencies": {
-    "@fallow-luau/darwin-arm64": "0.1.0",
-    "@fallow-luau/darwin-x64": "0.1.0",
-    "@fallow-luau/linux-arm64": "0.1.0",
-    "@fallow-luau/linux-x64": "0.1.0",
-    "@fallow-luau/win32-x64": "0.1.0"
+    "@fallow-luau/darwin-arm64": "0.1.1",
+    "@fallow-luau/darwin-x64": "0.1.1",
+    "@fallow-luau/linux-arm64": "0.1.1",
+    "@fallow-luau/linux-x64": "0.1.1",
+    "@fallow-luau/win32-x64": "0.1.1"
   }
 }

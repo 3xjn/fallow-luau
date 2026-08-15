@@ -1,11 +1,17 @@
 {
   "name": "@fallow-luau/darwin-arm64",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "fallow-luau binary for macOS Apple Silicon",
   "license": "MIT",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
-  "files": ["bin/fallow-luau"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/fallow-luau"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/3xjn/fallow-luau.git",
