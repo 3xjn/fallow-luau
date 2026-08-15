@@ -5,6 +5,9 @@ use crate::graph::RequireGraph;
 use crate::meta::schema_meta;
 
 pub fn schema_manifest(explain: bool) -> Value {
+    let done = |name: &str, description: &str| {
+        json!({ "name": name, "description": description, "status": "done" })
+    };
     let mut v = json!({
         "name": "fallow-luau",
         "manifest_version": "1",
@@ -12,28 +15,28 @@ pub fn schema_manifest(explain: bool) -> Value {
         "version": env!("CARGO_PKG_VERSION"),
         "parity_doc": "docs/parity.md",
         "commands": [
-            { "name": "schema", "description": "Dump the capability manifest as JSON", "status": "done" },
-            { "name": "list", "description": "List discovered Luau files and the require graph", "status": "done" },
-            { "name": "health", "description": "Complexity, file scores, hotspots, targets", "status": "done" },
-            { "name": "dead-code", "description": "Unused files, returned keys, locals, require cycles", "status": "done" },
-            { "name": "dupes", "description": "Token/suffix-array clones across .lua/.luau", "status": "done" },
-            { "name": "audit", "description": "Combined dead-code + health + dupes with verdict", "status": "done" },
-            { "name": "explain", "description": "Rule docs for one issue type", "status": "done" },
-            { "name": "mcp", "description": "stdio MCP server wrapping the same library", "status": "done" },
-            { "name": "inspect", "description": "Compose evidence for one file or returned key", "status": "todo" },
-            { "name": "trace", "description": "Callers/callees of a returned key", "status": "todo" },
-            { "name": "watch", "description": "Re-run on file change", "status": "todo" },
-            { "name": "init", "description": "Emit fallow-luau config", "status": "todo" },
-            { "name": "config", "description": "Print resolved config", "status": "todo" },
-            { "name": "suppressions", "description": "Inventory ignore markers", "status": "todo" },
-            { "name": "report", "description": "Re-render saved JSON", "status": "todo" },
-            { "name": "flags", "description": "Feature/settings gates via plugins", "status": "todo" },
-            { "name": "viz", "description": "HTML treemap + require graph", "status": "todo" }
+            done("schema", "Dump the capability manifest as JSON"),
+            done("list", "List discovered Luau files and the require graph"),
+            done("health", "Complexity, file scores, hotspots, targets, score"),
+            done("dead-code", "Unused files, returned keys, locals, types, cycles"),
+            done("dupes", "Token/suffix-array clones across .lua/.luau"),
+            done("audit", "Combined dead-code + health + dupes with verdict"),
+            done("explain", "Rule docs for one issue type"),
+            done("inspect", "Compose evidence for one file or returned key"),
+            done("trace", "Callers/callees through the require graph"),
+            done("watch", "Re-run audit when files change"),
+            done("init", "Emit fallow-luau config"),
+            done("config", "Print resolved config"),
+            done("suppressions", "Inventory ignore markers"),
+            done("report", "Re-render saved JSON"),
+            done("flags", "Feature/settings gate detection"),
+            done("viz", "HTML treemap + require graph"),
+            done("mcp", "stdio MCP server wrapping the same library")
         ],
         "issue_types": known_rules(),
         "mcp_tools": [
             "schema", "list_project", "check_health", "find_dead_code",
-            "find_dupes", "audit", "explain"
+            "find_dupes", "audit", "explain", "inspect", "trace", "flags"
         ],
         "parser": "full_moon (luau)",
         "require_resolution": {
@@ -43,9 +46,9 @@ pub fn schema_manifest(explain: bool) -> Value {
         },
         "skip": [
             "css", "npm", "typescript-checker", "knip", "jscpd-migrate",
-            "fallow-cloud", "react-next-vite", "node-napi"
+            "fallow-cloud", "react-next-vite", "node-napi", "fix"
         ],
-        "status": "steps-1-5"
+        "status": "parity-complete"
     });
     if explain {
         v.as_object_mut()

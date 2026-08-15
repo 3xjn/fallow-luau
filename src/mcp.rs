@@ -83,11 +83,14 @@ fn tool_defs() -> Vec<Value> {
     vec![
         tool("schema", "Capability manifest (commands, issue types, parity status)"),
         tool("list_project", "Discovered files and string-literal require graph"),
-        tool("check_health", "Complexity, MI, hotspots, targets"),
-        tool("find_dead_code", "Unused files, returned keys, locals, require cycles"),
+        tool("check_health", "Complexity, MI, hotspots, targets, score"),
+        tool("find_dead_code", "Unused files, returned keys, locals, types, cycles"),
         tool("find_dupes", "Token/suffix-array clones across .lua/.luau"),
         tool("audit", "Combined dead-code + health + dupes with pass/warn/fail"),
         tool("explain", "Rule docs for one issue type id"),
+        tool("inspect", "Compose evidence for one file or symbol"),
+        tool("trace", "Callers/callees through the require graph"),
+        tool("flags", "Feature/settings gate detection"),
     ]
 }
 
@@ -100,7 +103,11 @@ fn tool(name: &str, description: &str) -> Value {
             "properties": {
                 "root": { "type": "string", "description": "Project root (default .)" },
                 "id": { "type": "string", "description": "Issue type id for explain" },
-                "changed_since": { "type": "string", "description": "Git ref for audit scoping" }
+                "changed_since": { "type": "string", "description": "Git ref for audit scoping" },
+                "path": { "type": "string", "description": "File path for inspect/trace" },
+                "symbol": { "type": "string", "description": "Returned key / function name" },
+                "key": { "type": "string", "description": "Module key for trace" },
+                "depth": { "type": "integer", "description": "Trace depth (default 3)" }
             }
         }
     })
@@ -174,6 +181,23 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
         "explain" => {
             let id = args.get("id").and_then(|i| i.as_str()).unwrap_or("");
             Ok(explain_rule(id))
+        }
+        "inspect" => {
+            let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("");
+            let symbol = args.get("symbol").and_then(|s| s.as_str());
+            let report = crate::inspect::inspect_target(&root, path, symbol, true)?;
+            Ok(serde_json::to_value(report).unwrap())
+        }
+        "trace" => {
+            let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("");
+            let key = args.get("key").and_then(|k| k.as_str());
+            let depth = args.get("depth").and_then(|d| d.as_u64()).unwrap_or(3) as usize;
+            let report = crate::trace::trace_symbol(&root, path, key, depth, true)?;
+            Ok(serde_json::to_value(report).unwrap())
+        }
+        "flags" => {
+            let report = crate::flags::analyze_flags(&root, true)?;
+            Ok(serde_json::to_value(report).unwrap())
         }
         _ => Err(format!("unknown tool: {name}")),
     }

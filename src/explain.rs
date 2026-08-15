@@ -53,6 +53,12 @@ const RULES: &[(&str, Rule)] = &[
         action: "Remove the binding or prefix with `_` if intentionally unused.",
         docs: "https://docs.fallow.tools/explanations/dead-code",
     }),
+    ("unused-type", Rule {
+        name: "Unused type",
+        description: "Luau type / export type declaration never referenced in the file.",
+        action: "Remove the type or start using it.",
+        docs: "https://docs.fallow.tools/explanations/dead-code#unused-types",
+    }),
     ("circular-dependency", Rule {
         name: "Circular require",
         description: "Require-graph cycle with no depth limit (Tarjan SCC).",

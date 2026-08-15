@@ -8,24 +8,24 @@ Status: **done** | **partial** | **todo** | **skip** (SPEC).
 
 | Fallow | fallow-luau | Status | Luau notes |
 |---|---|---|---|
-| `schema` | `schema` | done | Capability manifest; expands as surfaces land |
+| `schema` | `schema` | done | Capability manifest |
 | `list` | `list` | done | Files + require edges + unresolved dynamics |
-| `health` | `health` | done | Same formulas; nested `local function` is a unit |
-| `dead-code` | `dead-code` | todo→this PR | Unused files, returned module keys, unused locals, cycles |
-| `dupes` | `dupes` | todo→this PR | Token / suffix-array clones on `.lua`/`.luau` |
-| `audit` | `audit` | todo→this PR | Dead + health + dupes; changed-file gate when git available |
-| `explain` | `explain` | todo→this PR | Rule docs without re-running analysis |
-| `inspect` | `inspect` | todo | Compose evidence for one file / returned key |
-| `trace` | `trace` | todo | Callers/callees of a returned key through require graph |
-| `watch` | `watch` | todo | Re-run on file change |
-| `init` | `init` | todo | Emit `fallow-luau.toml` / `.fallow-luau.json` |
-| `config` | `config` | todo | Print resolved config |
-| `suppressions` | `suppressions` | todo | Inventory `fallow-luau-ignore` markers |
-| `report` | `report` | todo | Re-render saved JSON |
-| `flags` | `flags` | todo | Feature/settings gates via plugins |
-| `viz` | `viz` | todo | HTML treemap + require graph |
-| `fix` | — | skip/later | Auto-remove unused keys (after dead-code is solid) |
-| `mcp` / `fallow-mcp` | `mcp` | todo→this PR | stdio MCP wrapping the same library |
+| `health` | `health` | done | Complexity, MI, SIG, hotspots, targets, score, baselines |
+| `dead-code` | `dead-code` | done | Unused files, returned keys, locals, types, cycles |
+| `dupes` | `dupes` | done | Token / suffix-array clones on `.lua`/`.luau` |
+| `audit` | `audit` | done | Dead + health + dupes; `--changed-since` |
+| `explain` | `explain` | done | Rule docs without re-running analysis |
+| `inspect` | `inspect` | done | Compose graph/complexity/dead/dupes for one path/key |
+| `trace` | `trace` | done | Bounded callers/callees on the require graph |
+| `watch` | `watch` | done | mtime poll → re-run audit |
+| `init` | `init` | done | `.fallow-luau.json` or `fallow-luau.toml` |
+| `config` | `config` | done | Print resolved config |
+| `suppressions` | `suppressions` | done | Inventory `-- fallow-luau-ignore*` markers |
+| `report` | `report` | done | Re-render saved JSON (json/compact/markdown) |
+| `flags` | `flags` | done | FF_/FeatureFlag/GetAttribute/settings/getenv |
+| `viz` | `viz` | done | Self-contained HTML treemap + require graph |
+| `fix` | — | skip/later | Auto-remove unused keys |
+| `mcp` / `fallow-mcp` | `mcp` | done | stdio MCP wrapping the same library |
 | CSS / npm / TS / knip / Cloud / React… | — | skip | Per SPEC |
 
 ## Health metrics (1:1 math)
@@ -35,26 +35,26 @@ Status: **done** | **partial** | **todo** | **skip** (SPEC).
 | Cyclomatic | `1 +` decision points | done |
 | Cognitive | SonarSource-style + nesting (Luau CF) | done |
 | Density | `total_cc / lines` | done |
-| Maintainability Index | `100 - dens×30 - dead×20 - min(ln(fan_out+1)×4, 15)` | done (dead wired when dead-code runs) |
+| Maintainability Index | `100 - dens×30 - dead×20 - min(ln(fan_out+1)×4, 15)` | done |
 | SIG unit size | 1–15 / 16–30 / 31–60 / >60 | done |
 | SIG interfacing | 0–2 / 3–4 / 5–6 / 7+ | done |
 | CRAP | `CC²×(1−cov/100)³+CC`; default `static_estimated` | done |
 | Hotspots | `norm_churn × norm_density × 100`; 90-day half-life | done |
 | Trend | accelerating / stable / cooling | done |
-| Targets + effort | Same weights / effort rules | done (baselines later) |
-| Health score (project letter) | Penalty table from docs | todo |
-| Baselines / snapshots | `--baseline` / `--save-baseline` | todo |
+| Targets + effort | Same weights / effort rules | done |
+| Health score (project letter) | Penalty table v2; A–F grades | done |
+| Baselines / snapshots | `--baseline` / `--save-baseline` on targets | done |
 
 ## Dead code (adapted graph)
 
 | Fallow | Luau equivalent | Status |
 |---|---|---|
-| Unused file | Unreachable from entry points (`init.lua`/`init.luau`, `**/main.*`, configurable) | this PR |
-| Unused export | Unused key on returned module table | this PR |
-| Unused type | Luau `type` / `export type` never referenced | todo |
-| Unused local | Local binding never read (any nested function) | this PR |
+| Unused file | Unreachable from entry points | done |
+| Unused export | Unused key on returned module table | done |
+| Unused type | Luau `type` / `export type` never referenced | done |
+| Unused local | Local binding never read (nested included) | done |
 | Unused dependency (npm) | — | skip |
-| Circular import | Require-graph cycle, no depth limit | this PR |
+| Circular import | Require-graph cycle, no depth limit | done |
 | CSS / class members / Pinia / … | — | skip |
 
 ## Graph / resolvers
@@ -66,28 +66,26 @@ Status: **done** | **partial** | **todo** | **skip** (SPEC).
 | Rojo paths / sourcemap | — | optional |
 | Custom import wrappers | — | optional |
 
-## MCP tools (target 1:1 names where sensible)
+## MCP tools
 
 | Fallow MCP | fallow-luau MCP | Status |
 |---|---|---|
-| (schema via CLI) | `schema` | this PR |
-| project / list | `list_project` | this PR |
-| `check_health` | `check_health` | this PR |
-| dead-code analyze | `find_dead_code` | this PR |
-| `find_dupes` | `find_dupes` | this PR |
-| `audit` | `audit` | this PR |
-| explain | `explain` | this PR |
+| schema | `schema` | done |
+| list | `list_project` | done |
+| `check_health` | `check_health` | done |
+| dead-code | `find_dead_code` | done |
+| `find_dupes` | `find_dupes` | done |
+| `audit` | `audit` | done |
+| explain | `explain` | done |
+| inspect | `inspect` | done |
+| trace | `trace` | done |
+| flags | `flags` | done |
 | CSS / runtime / fix / knip… | — | skip |
 
 ## `_meta`
 
-Every JSON command with `--explain`, and every MCP tool response, includes `_meta` so agents do not need a second call for definitions.
+Every JSON command with `--explain`, and every MCP tool response, includes `_meta`.
 
 ## Build order (SPEC)
 
-1. Parse + require graph + list + schema — **done**
-2. health — **done**
-3. dead-code — **this PR**
-4. dupes — **this PR**
-5. audit + MCP — **this PR**
-6. inspect / trace / explain / watch / flags / viz — explain now; rest todo
+1–6 all **done** for the Luau-adapted surface. Optional later: `fix`, Rojo resolver plugins, richer type-aware unused detection.

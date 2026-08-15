@@ -34,6 +34,19 @@ pub struct HealthOptions {
     pub now_unix: Option<i64>,
     /// When set (from dead-code), overrides per-file dead_code_ratio in MI.
     pub dead_ratio_override: Option<BTreeMap<String, f64>>,
+    /// Include project health score (0–100 + letter).
+    pub score: bool,
+    /// Optional duplication % for score penalty (from dupes).
+    pub duplication_pct: Option<f64>,
+    /// Circular dep count for score penalty.
+    pub circular_deps: Option<usize>,
+    /// Unused file / export counts for score penalty.
+    pub dead_file_count: Option<usize>,
+    pub dead_export_count: Option<usize>,
+    pub total_export_count: Option<usize>,
+    /// Baseline path: only report targets not in baseline.
+    pub baseline: Option<PathBuf>,
+    pub save_baseline: Option<PathBuf>,
 }
 
 impl Default for HealthOptions {
@@ -52,6 +65,14 @@ impl Default for HealthOptions {
             churn_override: None,
             now_unix: None,
             dead_ratio_override: None,
+            score: false,
+            duplication_pct: None,
+            circular_deps: None,
+            dead_file_count: None,
+            dead_export_count: None,
+            total_export_count: None,
+            baseline: None,
+            save_baseline: None,
         }
     }
 }
@@ -154,6 +175,14 @@ pub struct LargeFunction {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct HealthScore {
+    pub score: f64,
+    pub grade: String,
+    pub formula_version: u32,
+    pub penalties: BTreeMap<String, f64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct HealthReport {
     pub schema_version: u32,
     pub root: String,
@@ -169,6 +198,8 @@ pub struct HealthReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub large_functions: Option<Vec<LargeFunction>>,
     pub vital_signs: UnitProfiles,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub health_score: Option<HealthScore>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<serde_json::Value>,
 }
@@ -337,7 +368,7 @@ pub fn analyze_health(
         None
     };
 
-    let targets = if opts.targets {
+    let mut targets = if opts.targets {
         Some(compute_targets(
             &file_scores,
             hotspots.as_deref().unwrap_or(&[]),
@@ -347,8 +378,35 @@ pub fn analyze_health(
         None
     };
 
+    if let Some(path) = &opts.save_baseline {
+        if let Some(t) = targets.as_ref() {
+            let _ = save_targets_baseline(path, t);
+        }
+    }
+    if let Some(path) = &opts.baseline {
+        if let Some(t) = targets.as_mut() {
+            let known = load_targets_baseline(path).unwrap_or_default();
+            t.retain(|x| !known.contains(&baseline_key(x)));
+        }
+    }
+
     let flat: Vec<_> = all_functions.iter().map(|(_, f)| f.clone()).collect();
     let (size_p, iface_p) = profiles_from_functions(&flat);
+
+    let health_score = if opts.score {
+        Some(compute_health_score(
+            files.len(),
+            &file_scores,
+            &findings,
+            &large_functions,
+            &flat,
+            hotspots.as_deref().unwrap_or(&[]),
+            &fans,
+            opts,
+        ))
+    } else {
+        None
+    };
 
     HealthReport {
         schema_version: 1,
@@ -375,11 +433,135 @@ pub fn analyze_health(
             unit_size_profile: size_p,
             unit_interfacing_profile: iface_p,
         },
+        health_score,
         _meta: if opts.explain {
             Some(health_meta())
         } else {
             None
         },
+    }
+}
+
+fn baseline_key(t: &RefactorTarget) -> String {
+    format!("{}:{}", t.path, format!("{:?}", t.category).to_ascii_lowercase())
+}
+
+fn save_targets_baseline(path: &Path, targets: &[RefactorTarget]) -> Result<(), String> {
+    let keys: Vec<String> = targets.iter().map(baseline_key).collect();
+    let body = serde_json::to_string_pretty(&serde_json::json!({
+        "schema_version": 1,
+        "keys": keys
+    }))
+    .unwrap();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(path, body).map_err(|e| format!("write baseline {}: {e}", path.display()))
+}
+
+fn load_targets_baseline(path: &Path) -> Result<std::collections::BTreeSet<String>, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("read baseline: {e}"))?;
+    let v: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| format!("parse baseline: {e}"))?;
+    let keys = v
+        .get("keys")
+        .and_then(|k| k.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(keys)
+}
+
+fn compute_health_score(
+    total_files: usize,
+    file_scores: &[FileScore],
+    findings: &[ComplexityFinding],
+    large_functions: &[LargeFunction],
+    functions: &[FunctionMetrics],
+    hotspots: &[Hotspot],
+    fans: &BTreeMap<String, (usize, usize)>,
+    opts: &HealthOptions,
+) -> HealthScore {
+    let total_files = total_files.max(1) as f64;
+    let dead_files = opts.dead_file_count.unwrap_or(0) as f64;
+    let dead_file_pct = dead_files * 100.0 / total_files;
+    let dead_exports = opts.dead_export_count.unwrap_or(0) as f64;
+    let total_exports = opts.total_export_count.unwrap_or(0).max(1) as f64;
+    let dead_export_pct = dead_exports * 100.0 / total_exports;
+
+    let critical = findings
+        .iter()
+        .filter(|f| f.cyclomatic >= 50 || f.cognitive >= 30)
+        .count() as f64;
+    let fn_total = functions.len().max(1) as f64;
+    let critical_pct = critical * 100.0 / fn_total;
+
+    let mi_low = file_scores
+        .iter()
+        .filter(|s| s.maintainability_index < 40.0)
+        .count() as f64;
+    let mi_low_pct = if file_scores.is_empty() {
+        0.0
+    } else {
+        mi_low * 100.0 / file_scores.len() as f64
+    };
+
+    let hotspot_top = hotspots.iter().filter(|h| h.score >= 70.0).count() as f64;
+    let hotspot_denom = (total_files * 0.01).ceil().max(1.0);
+
+    let circular = opts.circular_deps.unwrap_or(0) as f64;
+    let circular_per_k = circular * 1000.0 / total_files;
+
+    let over60 = large_functions.len() as f64;
+    let over60_per_k = over60 * 1000.0 / fn_total;
+
+    let fan_ins: Vec<usize> = fans.values().map(|(fi, _)| *fi).collect();
+    let p95 = percentile(&fan_ins, 0.95).max(10);
+    let high_fan = fan_ins.iter().filter(|&&f| f > p95).count() as f64;
+    let coupling_high_pct = high_fan * 100.0 / total_files;
+
+    let dup_pct = opts.duplication_pct.unwrap_or(0.0);
+
+    let mut penalties = BTreeMap::new();
+    penalties.insert("dead_files".into(), (dead_file_pct * 0.2).min(15.0));
+    penalties.insert("dead_exports".into(), (dead_export_pct * 0.2).min(15.0));
+    penalties.insert("complexity".into(), (critical_pct * 4.0).min(20.0));
+    penalties.insert("maintainability".into(), (mi_low_pct * 1.5).min(15.0));
+    penalties.insert(
+        "hotspots".into(),
+        ((hotspot_top / hotspot_denom) * 10.0).min(10.0),
+    );
+    penalties.insert("circular_deps".into(), (circular_per_k * 0.5).min(25.0));
+    penalties.insert("unit_size".into(), (over60_per_k * 0.5).min(10.0));
+    penalties.insert("coupling".into(), (coupling_high_pct * 0.5).min(5.0));
+    penalties.insert(
+        "duplication".into(),
+        ((dup_pct - 5.0).max(0.0) * 1.0).min(10.0),
+    );
+
+    let sum: f64 = penalties.values().sum();
+    let score = (100.0 - sum).clamp(0.0, 100.0);
+    let grade = if score >= 85.0 {
+        "A"
+    } else if score >= 70.0 {
+        "B"
+    } else if score >= 55.0 {
+        "C"
+    } else if score >= 40.0 {
+        "D"
+    } else {
+        "F"
+    }
+    .to_string();
+
+    HealthScore {
+        score: (score * 10.0).round() / 10.0,
+        grade,
+        formula_version: 2,
+        penalties,
     }
 }
 

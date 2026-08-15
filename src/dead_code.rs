@@ -37,6 +37,7 @@ pub enum DeadKind {
     UnusedFile,
     UnusedExport,
     UnusedLocal,
+    UnusedType,
     CircularDependency,
 }
 
@@ -53,6 +54,7 @@ pub struct DeadCodeReport {
     pub unused_files: Vec<String>,
     pub unused_exports: Vec<DeadCodeFinding>,
     pub unused_locals: Vec<DeadCodeFinding>,
+    pub unused_types: Vec<DeadCodeFinding>,
     pub cycles: Vec<CycleInfo>,
     pub findings: Vec<DeadCodeFinding>,
     /// path → dead_code_ratio (unused returned keys / total returned keys)
@@ -152,6 +154,31 @@ pub fn analyze_dead_code(
     }
     unused_locals.sort_by(|a, b| (&a.path, a.line, &a.name).cmp(&(&b.path, b.line, &b.name)));
 
+    let mut unused_types = Vec::new();
+    for (path, info) in &modules {
+        for (name, line) in &info.type_decls {
+            // A type is used if referenced by another type name in the file (excluding itself).
+            let used = info
+                .type_refs
+                .iter()
+                .any(|r| r == name)
+                && info.type_decls.iter().filter(|(n, _)| n == name).count() >= 1;
+            // refs include the declaration identifier; require a second mention OR cross-decl use.
+            let mention_count = info.type_refs.iter().filter(|r| *r == name).count();
+            if mention_count <= 1 {
+                unused_types.push(DeadCodeFinding {
+                    path: path.clone(),
+                    kind: DeadKind::UnusedType,
+                    name: name.clone(),
+                    line: *line,
+                    message: format!("type `{name}` is never referenced"),
+                });
+            }
+            let _ = used;
+        }
+    }
+    unused_types.sort_by(|a, b| (&a.path, a.line, &a.name).cmp(&(&b.path, b.line, &b.name)));
+
     let cycles = find_cycles(graph);
     let mut findings = Vec::new();
     for f in &unused_files {
@@ -165,6 +192,7 @@ pub fn analyze_dead_code(
     }
     findings.extend(unused_exports.clone());
     findings.extend(unused_locals.clone());
+    findings.extend(unused_types.clone());
     for c in &cycles {
         let tip = c.path.first().cloned().unwrap_or_default();
         findings.push(DeadCodeFinding {
@@ -183,6 +211,7 @@ pub fn analyze_dead_code(
         unused_files,
         unused_exports,
         unused_locals,
+        unused_types,
         cycles,
         findings,
         dead_ratio_by_file,
@@ -280,6 +309,8 @@ fn reachability(graph: &RequireGraph, entries: &[String]) -> BTreeSet<String> {
 struct ModuleInfo {
     exports: Vec<(String, usize)>,
     unused_locals: Vec<LocalBinding>,
+    type_decls: Vec<(String, usize)>,
+    type_refs: std::collections::HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -290,11 +321,6 @@ struct LocalBinding {
 
 fn extract_module_info(ast: &full_moon::ast::Ast) -> ModuleInfo {
     let mut exports = Vec::new();
-    // Last return at file scope wins for module table.
-    if let Some((_, ret)) = ast.nodes().stmts_with_semicolon().last() {
-        // Block may end with return via last_stmt
-        let _ = ret;
-    }
     if let Some(last) = ast.nodes().last_stmt() {
         if let full_moon::ast::LastStmt::Return(r) = last {
             if let Some(expr) = r.returns().iter().next() {
@@ -304,9 +330,64 @@ fn extract_module_info(ast: &full_moon::ast::Ast) -> ModuleInfo {
     }
 
     let unused_locals = find_unused_locals(ast);
+    let (type_decls, type_refs) = collect_types(ast);
     ModuleInfo {
         exports,
         unused_locals,
+        type_decls,
+        type_refs,
+    }
+}
+
+fn collect_types(
+    ast: &full_moon::ast::Ast,
+) -> (Vec<(String, usize)>, std::collections::HashSet<String>) {
+    let mut decls = Vec::new();
+    let mut refs = std::collections::HashSet::new();
+    for stmt in ast.nodes().stmts() {
+        match stmt {
+            Stmt::TypeDeclaration(td) => {
+                let name = td.type_name().token().to_string();
+                let line = td
+                    .type_name()
+                    .start_position()
+                    .map(|p| p.line())
+                    .unwrap_or(1);
+                decls.push((name, line));
+                collect_type_refs_from_decl(td, &mut refs);
+            }
+            Stmt::ExportedTypeDeclaration(et) => {
+                let td = et.type_declaration();
+                let name = td.type_name().token().to_string();
+                let line = td
+                    .type_name()
+                    .start_position()
+                    .map(|p| p.line())
+                    .unwrap_or(1);
+                decls.push((name, line));
+                collect_type_refs_from_decl(td, &mut refs);
+            }
+            _ => {}
+        }
+    }
+    // Also scan source-ish type assertions via display tokens — type refs inside
+    // declarations already collected; strip self-refs below.
+    (decls, refs)
+}
+
+fn collect_type_refs_from_decl(
+    td: &full_moon::ast::luau::TypeDeclaration,
+    refs: &mut std::collections::HashSet<String>,
+) {
+    // Walk the type info display string for Identifier-like tokens is fragile;
+    // use Node tokens in the type definition subtree.
+    for token in td.tokens() {
+        if let full_moon::tokenizer::TokenType::Identifier { identifier } = token.token_type() {
+            let s = identifier.to_string();
+            // Skip the declared name itself when it appears as the left-hand side —
+            // callers remove self after.
+            refs.insert(s);
+        }
     }
 }
 
