@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/3xjn/fallow-luau/main/scripts/insta
 irm https://raw.githubusercontent.com/3xjn/fallow-luau/main/scripts/install.ps1 | iex
 ```
 
-Installs into `~/.local/bin` (Unix) or `%LOCALAPPDATA%\fallow-luau\bin` (Windows) and prints `--version`. If no release exists yet, the scripts fall back to `cargo install --git` when Rust is available.
+Installs into `~/.local/bin` (Unix) or `%LOCALAPPDATA%\fallow-luau\bin` (Windows) from the latest GitHub Release.
 
 ### Cargo
 
