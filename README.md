@@ -62,7 +62,7 @@ Or with Compose: copy [`examples/docker/compose.yaml`](examples/docker/compose.y
 
 ### GitHub Releases
 
-Download prebuilt binaries from [GitHub Releases](https://github.com/3xjn/fallow-luau/releases) (created by tagging `v*`).
+Download prebuilt binaries from [GitHub Releases](https://github.com/3xjn/fallow-luau/releases) (created automatically when a new `version` in `Cargo.toml` lands on `main`).
 
 | Asset | Platform |
 | --- | --- |
@@ -93,13 +93,4 @@ Right now the 1:1 Luau surface is in place: parse, require graph, health (incl. 
 
 ## Publishing notes (maintainers)
 
-1. Bump `version` in `Cargo.toml` and `npm/**/package.json`.
-2. Tag and push: `git tag v0.1.0 && git push origin v0.1.0` — the [release workflow](.github/workflows/release.yml) builds assets and creates the GitHub Release.
-3. Publish npm (after copying release binaries into `npm/@fallow-luau/*/bin/`):
-
-```bash
-# from a release machine / CI with the binaries in place
-npm publish ./npm/@fallow-luau/linux-x64 --access public
-# …repeat for each platform package…
-npm publish ./npm/fallow-luau --access public
-```
+Bump `version` in `Cargo.toml` (and run `scripts/sync-npm-version.sh` if publishing npm). Merge to `main` — the [release workflow](.github/workflows/release.yml) creates tag `v$VERSION` and uploads binaries automatically when that tag does not already exist.

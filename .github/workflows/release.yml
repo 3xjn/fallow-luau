@@ -1,15 +1,16 @@
-# Build multi-platform binaries and publish a GitHub Release.
-# Tag a version:  git tag v0.1.0 && git push origin v0.1.0
+# Auto-publish GitHub Releases from Cargo.toml version.
+# On every push to main: if tag v$VERSION does not exist yet, build binaries and create the release.
+# Manual: Actions → release → Run workflow
 name: release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.1.0). Empty = use Cargo.toml version."
+        description: "Override tag (e.g. v0.1.1). Empty = Cargo.toml version."
         required: false
         default: ""
 
@@ -20,7 +21,50 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.meta.outputs.should_release }}
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version / skip if already released
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.tag }}" ]]; then
+            TAG="${{ inputs.tag }}"
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
+          fi
+          [[ "$TAG" == v* ]] || TAG="v${TAG}"
+          VERSION="${TAG#v}"
+
+          # Tag pushes always release. Main/dispatch: only if tag is new.
+          SHOULD=true
+          if [[ "${{ github.ref_type }}" != "tag" ]]; then
+            if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+              SHOULD=false
+            elif git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+              SHOULD=false
+            fi
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "should_release=$SHOULD" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG version=$VERSION should_release=$SHOULD"
+
   build:
+    needs: decide
+    if: needs.decide.outputs.should_release == 'true'
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -62,33 +106,26 @@ jobs:
 
       - name: Build
         shell: bash
-        run: |
-          set -euo pipefail
-          cargo build --release --target "${{ matrix.target }}" --bin fallow-luau
+        run: cargo build --release --target "${{ matrix.target }}" --bin fallow-luau
 
       - name: Package
         shell: bash
+        env:
+          VERSION: ${{ needs.decide.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME:-}"
-          if [[ "$VERSION" != v* ]]; then
-            VERSION="v$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
-          fi
-          VERSION="${VERSION#v}"
           TARGET="${{ matrix.target }}"
-          OUT="dist"
+          OUT=dist
           mkdir -p "$OUT"
-          BIN="target/${TARGET}/release/fallow-luau"
           if [[ "${{ matrix.archive }}" == "zip" ]]; then
-            BIN="target/${TARGET}/release/fallow-luau.exe"
             STAGE="fallow-luau-${VERSION}-${TARGET}"
             mkdir -p "$STAGE"
-            cp "$BIN" "$STAGE/fallow-luau.exe"
+            cp "target/${TARGET}/release/fallow-luau.exe" "$STAGE/fallow-luau.exe"
             7z a -tzip "${OUT}/fallow-luau-${VERSION}-${TARGET}.zip" "./${STAGE}/fallow-luau.exe"
           else
             STAGE="fallow-luau-${VERSION}-${TARGET}"
             mkdir -p "$STAGE"
-            cp "$BIN" "$STAGE/fallow-luau"
+            cp "target/${TARGET}/release/fallow-luau" "$STAGE/fallow-luau"
             chmod +x "$STAGE/fallow-luau"
             tar -czf "${OUT}/fallow-luau-${VERSION}-${TARGET}.tar.gz" -C "$STAGE" fallow-luau
           fi
@@ -101,25 +138,11 @@ jobs:
           path: dist/*
 
   release:
-    needs: build
+    needs: [decide, build]
+    if: needs.decide.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Resolve tag
-        id: meta
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.tag }}" ]]; then
-            TAG="${{ inputs.tag }}"
-          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            TAG="${GITHUB_REF_NAME}"
-          else
-            TAG="v$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
-          fi
-          [[ "$TAG" == v* ]] || TAG="v${TAG}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -133,8 +156,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: fallow-luau ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ needs.decide.outputs.tag }}
+          name: fallow-luau ${{ needs.decide.outputs.tag }}
           generate_release_notes: true
           files: artifacts/*
         env:
