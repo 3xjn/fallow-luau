@@ -1,0 +1,31 @@
+This is an independent local evaluation run. Model: GPT-6 Sol; reasoning: medium.
+Your sole checkout and editing responsibility: C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\runs\alien-signals-assisted
+Existing test command: lune run tests
+Runtime: C:/Users/asher/.cargo/bin/lune.exe (0.10.4). All changes stay local; do not push, open PRs/issues, or contact anyone.
+Find a reproducible behavior defect in production Luau code in this checkout
+and make the smallest safe repair. Read the local documentation and run the
+existing test command. Choose a concrete behavior with evidence, not a style
+preference or an improvement to a health score. Add a regression that fails
+against the original code and passes against your fix, then run the original
+suite. Keep the public API compatible unless correcting the defect requires
+otherwise, and explain any behavior change. Do not weaken or remove tests.
+If you cannot substantiate a safe change, report that rather than manufacture
+one. Do not inspect sibling checkouts, evaluation results, online issues, or
+git history. You are not alone in the workspace: edit only your assigned
+checkout and do not revert anyone else's work. Do not delegate further or
+contact third parties.
+
+Write `EVALUATION.md` in your checkout with the symptom, affected source,
+reproduction, expected and observed behavior, change, before/after regression
+results, full-suite result, and uncertainties. Record the commands used and
+explain which evidence led you to the issue. Report any false leads. Stop when
+the selected repair and its evidence are complete, or explain why no supported
+repair was found.
+You have fallow-luau at the supplied absolute binary path. Start with its
+`health --root . --complexity --file-scores --explain` report and use `inspect`
+or `list` when relevant. Treat metrics as navigation hints, not proof of a bug
+or permission to delete code. Imports outside literal filesystem paths are
+unresolved; dead-code analysis is heuristic. Verify any hypothesis in source
+and by executing tests. Record whether the tool changed your investigation
+and which findings were useful or misleading. Do not read the analyzer's source.
+Analyzer binary: C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\bin\fallow-luau.exe

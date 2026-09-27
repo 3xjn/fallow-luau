@@ -1,0 +1,44 @@
+{
+  "model": "gpt-6-sol",
+  "reasoning": "medium",
+  "analyzer_base": "bcc7f1a2beb3d95a71ab8dcbf11f2ec5fa5a7e31",
+  "analyzer_sha256": "A6E7BEABEEE73C14F51A0FCEB2376478DC409B4AB515D1E8E9295FF0925FEB85",
+  "runtime": "Lune 0.10.4",
+  "started_at": "2026-09-26T22:36:19.2286676Z",
+  "runs": [
+    {
+      "agent": "/root/posthog_control",
+      "condition": "control",
+      "project": "posthog-roblox",
+      "dispatch_recorded_at": "2026-09-26T22:37:33.2438093Z",
+      "completion_observed_at": "2026-09-26T22:38:18.0157086Z"
+    },
+    {
+      "agent": "/root/posthog_assisted",
+      "condition": "assisted",
+      "project": "posthog-roblox",
+      "dispatch_recorded_at": "2026-09-26T22:37:33.2440629Z",
+      "completion_observed_at": "2026-09-26T22:38:18.0201168Z"
+    },
+    {
+      "agent": "/root/alien_control",
+      "condition": "control",
+      "project": "alien-signals",
+      "dispatch_recorded_at": "2026-09-26T22:37:33.2440926Z",
+      "completion_observed_at": "2026-09-26T22:39:25.8322219Z"
+    },
+    {
+      "agent": "/root/alien_assisted",
+      "condition": "assisted",
+      "project": "alien-signals",
+      "dispatch_recorded_at": "2026-09-26T22:38:18.0101503Z",
+      "completion_observed_at": "2026-09-26T22:40:24.5860952Z"
+    }
+  ],
+  "interpretation": "No demonstrated net agent benefit: two validated repairs per condition.",
+  "timing_note": "Dispatch and completion timestamps were recorded after tool returns; they are not exact execution boundaries. Do not infer latency or cost differences.",
+  "validated_repairs": {
+    "control": 2,
+    "assisted": 2
+  }
+}

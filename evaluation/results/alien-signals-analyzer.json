@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "root": "\\\\?\\C:\\Users\\asher\\Documents\\ChatGPT\\fallow-luau\\target\\evaluation\\upstream\\alien-signals",
+  "files_analyzed": 12,
+  "findings": [
+    {
+      "path": "src/system.luau",
+      "name": "createReactiveSystem/propagate",
+      "line": 114,
+      "lines": 84,
+      "cyclomatic": 23,
+      "cognitive": 52,
+      "rule": "fallow-luau/high-complexity"
+    },
+    {
+      "path": "src/system.luau",
+      "name": "createReactiveSystem/checkDirty",
+      "line": 271,
+      "lines": 80,
+      "cyclomatic": 19,
+      "cognitive": 53,
+      "rule": "fallow-luau/high-cognitive-complexity"
+    },
+    {
+      "path": "src/system.luau",
+      "name": "createReactiveSystem/clearTracking",
+      "line": 204,
+      "lines": 36,
+      "cyclomatic": 8,
+      "cognitive": 16,
+      "rule": "fallow-luau/high-cognitive-complexity"
+    }
+  ],
+  "file_scores": [
+    {
+      "path": "src/system.luau",
+      "maintainability_index": 73.31,
+      "complexity_density": 0.223,
+      "dead_code_ratio": 1.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 417,
+      "function_count": 14,
+      "total_cyclomatic": 93,
+      "total_cognitive": 173,
+      "crap_max": 552.0,
+      "crap_above_threshold": 7
+    },
+    {
+      "path": "tests/issue_48.spec.luau",
+      "maintainability_index": 88.51,
+      "complexity_density": 0.2906,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 1,
+      "lines": 117,
+      "function_count": 13,
+      "total_cyclomatic": 34,
+      "total_cognitive": 27,
+      "crap_max": 90.0,
+      "crap_above_threshold": 2
+    },
+    {
+      "path": "tests/effect.spec.luau",
+      "maintainability_index": 90.54,
+      "complexity_density": 0.223,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 1,
+      "lines": 296,
+      "function_count": 44,
+      "total_cyclomatic": 66,
+      "total_cognitive": 23,
+      "crap_max": 30.0,
+      "crap_above_threshold": 2
+    },
+    {
+      "path": "benchmarks/complex.luau",
+      "maintainability_index": 90.77,
+      "complexity_density": 0.1613,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 2,
+      "lines": 31,
+      "function_count": 3,
+      "total_cyclomatic": 5,
+      "total_cognitive": 3,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "benchmarks/propagate.luau",
+      "maintainability_index": 90.43,
+      "complexity_density": 0.1724,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 2,
+      "lines": 29,
+      "function_count": 3,
+      "total_cyclomatic": 5,
+      "total_cognitive": 3,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "tests/computed.spec.luau",
+      "maintainability_index": 91.7,
+      "complexity_density": 0.1842,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 1,
+      "lines": 76,
+      "function_count": 14,
+      "total_cyclomatic": 14,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "tests/untrack.spec.luau",
+      "maintainability_index": 93.36,
+      "complexity_density": 0.129,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 1,
+      "lines": 31,
+      "function_count": 3,
+      "total_cyclomatic": 4,
+      "total_cognitive": 1,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "tests/topology.spec.luau",
+      "maintainability_index": 93.83,
+      "complexity_density": 0.1134,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 1,
+      "lines": 494,
+      "function_count": 54,
+      "total_cyclomatic": 56,
+      "total_cognitive": 3,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "tests/effectScope.spec.luau",
+      "maintainability_index": 93.98,
+      "complexity_density": 0.1081,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 1,
+      "lines": 37,
+      "function_count": 4,
+      "total_cyclomatic": 4,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "benchmarks/bench.luau",
+      "maintainability_index": 94.55,
+      "complexity_density": 0.1818,
+      "dead_code_ratio": 0.0,
+      "fan_in": 2,
+      "fan_out": 0,
+      "lines": 11,
+      "function_count": 1,
+      "total_cyclomatic": 2,
+      "total_cognitive": 1,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/init.luau",
+      "maintainability_index": 95.04,
+      "complexity_density": 0.1653,
+      "dead_code_ratio": 0.0,
+      "fan_in": 8,
+      "fan_out": 0,
+      "lines": 236,
+      "function_count": 19,
+      "total_cyclomatic": 39,
+      "total_cognitive": 26,
+      "crap_max": 5.08,
+      "crap_above_threshold": 0
+    }
+  ],
+  "large_functions": [
+    {
+      "path": "src/system.luau",
+      "name": "createReactiveSystem",
+      "line": 49,
+      "lines": 364
+    },
+    {
+      "path": "tests/topology.spec.luau",
+      "name": "shouldOnlyUpdateEverySignalOnceJaggedDiamondGraphPlusTails",
+      "line": 143,
+      "lines": 97
+    },
+    {
+      "path": "src/system.luau",
+      "name": "createReactiveSystem/propagate",
+      "line": 114,
+      "lines": 84
+    },
+    {
+      "path": "src/system.luau",
+      "name": "createReactiveSystem/checkDirty",
+      "line": 271,
+      "lines": 80
+    },
+    {
+      "path": "tests/issue_48.spec.luau",
+      "name": "reaction",
+      "line": 27,
+      "lines": 66
+    }
+  ],
+  "vital_signs": {
+    "unit_size_profile": {
+      "low_risk": 73.83720930232558,
+      "medium_risk": 17.441860465116278,
+      "high_risk": 5.813953488372093,
+      "very_high_risk": 2.9069767441860463
+    },
+    "unit_interfacing_profile": {
+      "low_risk": 98.83720930232558,
+      "medium_risk": 1.1627906976744187,
+      "high_risk": 0.0,
+      "very_high_risk": 0.0
+    }
+  },
+  "_meta": {
+    "docs": "https://docs.fallow.tools/explanations/health",
+    "limitations": "Metrics are navigation hints, not evidence of a behavior defect. Coverage is static_estimated, not measured. Unresolved imports and heuristic dead-code detection can affect scores; verify candidates in source and tests.",
+    "metrics": {
+      "cognitive": {
+        "description": "Comprehension cost with nesting penalties (SonarSource model adapted to Luau).",
+        "interpretation": "0–7 easy; 8–15 moderate; 15+ hard. Default threshold 15.",
+        "name": "Cognitive complexity",
+        "range": "[0, ∞)"
+      },
+      "complexity_density": {
+        "description": "Total cyclomatic complexity / lines of code for the file.",
+        "interpretation": "<0.3 low; 0.3–1.0 moderate; >1.0 very dense.",
+        "name": "Complexity density",
+        "range": "[0, ∞)"
+      },
+      "crap": {
+        "description": "CC² × (1 − cov/100)³ + CC. Default coverage from test require graph (85% direct / 40% transitive / 0%).",
+        "interpretation": "<30 acceptable; 30–99 moderate; 100+ high.",
+        "name": "CRAP",
+        "range": "[0, ∞)"
+      },
+      "cyclomatic": {
+        "description": "1 + decision points (if/elseif, loops, and/or, Luau if-expressions). Every function is a unit, including nested local function.",
+        "interpretation": "1–10 simple; 11–20 moderate; 21–50 high; 50+ very high. Default threshold 20.",
+        "name": "Cyclomatic complexity",
+        "range": "[1, ∞)"
+      },
+      "hotspot_score": {
+        "description": "normalized_churn × normalized_density × 100. Churn uses 90-day half-life on commits.",
+        "interpretation": "higher = more risky; project-relative.",
+        "name": "Hotspot score",
+        "range": "[0, 100]"
+      },
+      "maintainability_index": {
+        "description": "100 - (density×30) - (dead_ratio×20) - min(ln(fan_out+1)×4, 15), clamped to [0,100].",
+        "interpretation": "higher is better; <40 poor, 40–70 moderate, >70 good",
+        "name": "Maintainability Index",
+        "range": "[0, 100]"
+      },
+      "target_priority": {
+        "description": "min(density,1)×30 + hotspot_boost×25 + dead_ratio×20 + min(fan_in/20,1)×15 + min(fan_out/30,1)×10",
+        "interpretation": "higher priority first.",
+        "name": "Refactoring target priority",
+        "range": "[0, 100]"
+      },
+      "unit_interfacing": {
+        "description": "Parameter-count bins: 0–2 low, 3–4 medium, 5–6 high, 7+ very high.",
+        "interpretation": "Prefer few parameters per function.",
+        "name": "SIG unit interfacing",
+        "range": "parameter bins"
+      },
+      "unit_size": {
+        "description": "Function length in lines. Bins: 1–15 low, 16–30 medium, 31–60 high, >60 very high.",
+        "interpretation": "Flag functions over 60 lines by default.",
+        "name": "SIG unit size",
+        "range": "LOC bins"
+      }
+    }
+  }
+}

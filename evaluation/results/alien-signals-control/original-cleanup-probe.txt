@@ -1,0 +1,4 @@
+creation_succeeded false
+original_error_preserved false
+setter_succeeded false
+callback_runs 2

@@ -54,7 +54,7 @@ fn run_once(root: &Path, changed_since: &Option<String>, explain: bool) -> Resul
         &AuditOptions {
             explain,
             changed_since: changed_since.clone(),
-            ..AuditOptions::default()
+            ..AuditOptions::configured(root)?
         },
     )?;
     println!("{}", serde_json::to_string_pretty(&report).unwrap());

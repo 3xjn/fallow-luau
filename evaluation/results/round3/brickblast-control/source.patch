@@ -1,0 +1,13 @@
+diff --git a/src/shared/game/UIControlRules.luau b/src/shared/game/UIControlRules.luau
+index c935c87..04ecf59 100644
+--- a/src/shared/game/UIControlRules.luau
++++ b/src/shared/game/UIControlRules.luau
+@@ -255,6 +255,8 @@ function UIControlRules.validateBoardGridChildren(children)
+ 		elseif
+ 			typeof(x) ~= "number"
+ 			or typeof(y) ~= "number"
++			or x % 1 ~= 0
++			or y % 1 ~= 0
+ 			or x < 1
+ 			or x > Config.BoardSize
+ 			or y < 1

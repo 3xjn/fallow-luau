@@ -1,0 +1,5 @@
+set error C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src:52: attempt to call a string value
+runs after set 2 1 expected 2 2
+runs after unrelated set 2 2 2 expected 2 2 2
+next set error nil
+runs after next set 3 3 expected 3 3

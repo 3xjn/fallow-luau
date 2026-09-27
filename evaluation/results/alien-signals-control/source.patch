@@ -1,0 +1,19 @@
+diff --git a/src/init.luau b/src/init.luau
+index 3e9cc59..554bbfe 100644
+--- a/src/init.luau
++++ b/src/init.luau
+@@ -198,10 +198,12 @@ local function effect<T>(fn: () -> T): () -> ()
+ 	end
+ 	local prevSub = activeSub
+ 	activeSub = e
+-	local success, error = pcall(e.fn)
++	local success, err = pcall(e.fn)
+ 	activeSub = prevSub
+ 	if not success then
+-		error(error)
++		startTracking(e)
++		endTracking(e)
++		error(err)
+ 	end
+ 	return effectStop(e)
+ end

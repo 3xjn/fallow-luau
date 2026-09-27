@@ -3,17 +3,17 @@
 use std::path::Path;
 
 use crate::complexity::analyze_functions;
-use crate::discover::{discover_files, is_test_path};
+use crate::dead_code::{analyze_dead_code, DeadCodeOptions};
+use crate::discover::{discover_configured_files, is_test_path};
 use crate::graph::{build_require_graph, display_rel, fan_counts};
 use crate::health::{analyze_health, FileAnalysis, HealthOptions};
-use crate::dead_code::{analyze_dead_code, DeadCodeOptions};
 use full_moon::parse;
 
 pub fn render_viz_html(root: &Path) -> Result<String, String> {
     let root = root
         .canonicalize()
         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
-    let files = discover_files(&root);
+    let files = discover_configured_files(&root)?;
     let graph = build_require_graph(&root, &files)?;
     let dead = analyze_dead_code(
         &root,
@@ -49,7 +49,7 @@ pub fn render_viz_html(root: &Path) -> Result<String, String> {
             dead_ratio_override: Some(dead.dead_ratio_by_file.clone()),
             ..HealthOptions::default()
         },
-    );
+    )?;
     let fans = fan_counts(&graph);
     let scores = health.file_scores.unwrap_or_default();
 
@@ -91,9 +91,8 @@ pub fn render_viz_html(root: &Path) -> Result<String, String> {
         .edges
         .iter()
         .filter_map(|e| {
-            e.to.as_ref().map(|to| {
-                serde_json::json!({ "from": e.from, "to": to, "line": e.line })
-            })
+            e.to.as_ref()
+                .map(|to| serde_json::json!({ "from": e.from, "to": to, "line": e.line }))
         })
         .collect();
 

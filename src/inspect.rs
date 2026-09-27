@@ -6,11 +6,11 @@ use serde::Serialize;
 
 use crate::complexity::analyze_functions;
 use crate::dead_code::{analyze_dead_code, DeadCodeOptions};
-use crate::discover::discover_files;
-use crate::dupes::{analyze_dupes, DupesOptions};
+use crate::discover::discover_configured_files;
+use crate::discover::is_test_path;
+use crate::dupes::analyze_dupes;
 use crate::graph::{build_require_graph, display_rel, fan_counts};
 use crate::health::{analyze_health, FileAnalysis, HealthOptions};
-use crate::discover::is_test_path;
 use full_moon::parse;
 
 #[derive(Debug, Clone, Serialize)]
@@ -41,7 +41,7 @@ pub fn inspect_target(
     let root = root
         .canonicalize()
         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
-    let files = discover_files(&root);
+    let files = discover_configured_files(&root)?;
     let graph = build_require_graph(&root, &files)?;
     let rel = normalize_target(&root, target, &graph.files)?;
 
@@ -49,10 +49,17 @@ pub fn inspect_target(
     let source = std::fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
     let ast = parse(&source).map_err(|e| format!("parse {rel}: {e:?}"))?;
     let functions = analyze_functions(&ast);
+    let available: Vec<_> = functions.iter().map(|f| f.name.clone()).collect();
     let functions = if let Some(sym) = symbol {
         functions
             .into_iter()
-            .filter(|f| f.name == sym || f.name.ends_with(&format!("/{sym}")))
+            .filter(|f| {
+                let name = f.name.replace(':', ".");
+                let sym = sym.replace(':', ".");
+                name == sym
+                    || name.ends_with(&format!("/{sym}"))
+                    || name.ends_with(&format!(".{sym}"))
+            })
             .collect::<Vec<_>>()
     } else {
         functions
@@ -78,16 +85,20 @@ pub fn inspect_target(
         })
         .collect();
 
-    let dupes = analyze_dupes(
-        &root,
-        &files,
-        &DupesOptions {
-            explain: false,
-            min_tokens: 20,
-            min_lines: 4,
-            min_occurrences: 2,
-        },
-    )?;
+    let exported = symbol.is_some_and(|s| {
+        dead.exports_by_file
+            .get(&rel)
+            .is_some_and(|names| names.iter().any(|n| n == s))
+    });
+    if symbol.is_some() && functions.is_empty() && dead_findings.is_empty() && !exported {
+        return Err(format!(
+            "unknown symbol {}; available functions: {}",
+            symbol.unwrap(),
+            available.join(", ")
+        ));
+    }
+    let config = crate::config::load_config(&root)?.config;
+    let dupes = analyze_dupes(&root, &files, &config.dupes_options())?;
     let clone_groups: Vec<_> = dupes
         .clone_groups
         .into_iter()
@@ -115,11 +126,11 @@ pub fn inspect_target(
         hotspots: false,
         targets: false,
         dead_ratio_override: Some(dead.dead_ratio_by_file.clone()),
-        ..HealthOptions::default()
+        ..config.health_options()
     };
     hopts.complexity = true;
     hopts.file_scores = true;
-    let health = analyze_health(&root, &analyses, &graph, &hopts);
+    let health = analyze_health(&root, &analyses, &graph, &hopts)?;
     let file_score = health
         .file_scores
         .and_then(|s| s.into_iter().find(|f| f.path == rel));
@@ -167,7 +178,11 @@ pub fn inspect_target(
     })
 }
 
-fn normalize_target(root: &Path, target: &str, known: &[String]) -> Result<String, String> {
+pub(crate) fn normalize_target(
+    root: &Path,
+    target: &str,
+    known: &[String],
+) -> Result<String, String> {
     let t = target.replace('\\', "/");
     if known.iter().any(|k| k == &t) {
         return Ok(t);
@@ -178,11 +193,21 @@ fn normalize_target(root: &Path, target: &str, known: &[String]) -> Result<Strin
         root.join(target)
     };
     if abs.exists() {
-        return Ok(display_rel(root, &abs));
+        let rel = display_rel(root, &abs);
+        return known
+            .contains(&rel)
+            .then_some(rel)
+            .ok_or_else(|| format!("file is outside analyzed scope: {target}"));
     }
     // fuzzy: suffix match
-    if let Some(hit) = known.iter().find(|k| k.ends_with(&t) || k.ends_with(target)) {
-        return Ok(hit.clone());
+    let matches: Vec<_> = known
+        .iter()
+        .filter(|k| k.ends_with(&format!("/{t}")))
+        .collect();
+    if matches.len() == 1 {
+        return Ok(matches[0].clone());
+    } else if !matches.is_empty() {
+        return Err(format!("ambiguous file `{target}`: {matches:?}"));
     }
     Err(format!("unknown file `{target}`"))
 }

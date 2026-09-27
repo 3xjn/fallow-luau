@@ -7,7 +7,7 @@ use full_moon::node::Node;
 use full_moon::parse;
 use serde::Serialize;
 
-use crate::discover::discover_files;
+use crate::discover::discover_configured_files;
 use crate::graph::display_rel;
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,8 +42,9 @@ pub fn analyze_flags(root: &Path, explain: bool) -> Result<FlagsReport, String> 
     let root = root
         .canonicalize()
         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
-    let files = discover_files(&root);
+    let files = discover_configured_files(&root)?;
     let mut flags = Vec::new();
+    let markers = crate::suppressions::load_markers(&root, &files)?;
 
     for file in &files {
         let rel = display_rel(&root, file);
@@ -103,6 +104,7 @@ pub fn analyze_flags(root: &Path, explain: bool) -> Result<FlagsReport, String> 
     flags.sort_by(|a, b| (&a.path, a.line, &a.name).cmp(&(&b.path, b.line, &b.name)));
     flags.dedup_by(|a, b| a.path == b.path && a.line == b.line && a.name == b.name);
 
+    flags.retain(|f| !crate::suppressions::suppresses(&markers, &f.path, f.line, "feature-flag"));
     Ok(FlagsReport {
         schema_version: 1,
         root: root.display().to_string(),

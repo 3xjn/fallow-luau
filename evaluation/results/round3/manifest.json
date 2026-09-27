@@ -1,0 +1,24 @@
+{
+  "outcome": "Assisted 3 validated repairs vs control 1 on fresh project; no refactor-only proposals validated.",
+  "baseline_tests": 195,
+  "baseline_modules": 14,
+  "model": "gpt-6-sol",
+  "project": "yoelthewhale/brickblast-roblox",
+  "round": 3,
+  "analyzer_sha256": "BB46499D838D649E53648AEA9B67B7EB9A6394605DFA23E9582228ED01FB5F84",
+  "pin": "74efd4d1e5966737718d3b372a32f5528946bc99",
+  "reasoning": "medium",
+  "baseline_exit": 0,
+  "validated_repairs": {
+    "control": 1,
+    "assisted": 3
+  },
+  "tests_after": {
+    "control": 196,
+    "assisted": 198
+  },
+  "independent_replays": {
+    "patched_exit": 0,
+    "original_exit": 1
+  }
+}

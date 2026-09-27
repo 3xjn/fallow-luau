@@ -1,0 +1,111 @@
+diff --git a/src/Server/EventQueue.luau b/src/Server/EventQueue.luau
+index d2b2e98..d3794da 100644
+--- a/src/Server/EventQueue.luau
++++ b/src/Server/EventQueue.luau
+@@ -71,9 +71,14 @@ function EventQueue:_takeBatch(): { any }
+     return batch
+ end
+ 
+-function EventQueue:_removeFront(count: number)
+-    for _ = 1, count do
+-        table.remove(self._events, 1)
++function EventQueue:_removeBatch(batch)
++    -- Enqueue or clear may change the queue while sendBatch yields. Remove only
++    -- events actually sent (or rejected), never later events at the same indices.
++    for _, event in batch do
++        local index = table.find(self._events, event)
++        if index then
++            table.remove(self._events, index)
++        end
+     end
+ end
+ 
+@@ -101,14 +106,14 @@ function EventQueue:flush()
+             local action = self._retryPolicy.classify(result.statusCode)
+ 
+             if action == "success" then
+-                self:_removeFront(#batch)
++                self:_removeBatch(batch)
+                 self._retryCount = 0
+                 self._pausedUntil = 0
+             elseif action == "drop" then
+                 self._logger:warn(
+                     `dropping {#batch} events (non-retryable status {result.statusCode})`
+                 )
+-                self:_removeFront(#batch)
++                self:_removeBatch(batch)
+             elseif action == "retry_smaller" then
+                 self._adjustedBatchSize = math.max(1, math.floor(self._adjustedBatchSize / 2))
+                 self._logger:warn(
+diff --git a/src/Server/FeatureFlags.luau b/src/Server/FeatureFlags.luau
+index 83490be..c49306f 100644
+--- a/src/Server/FeatureFlags.luau
++++ b/src/Server/FeatureFlags.luau
+@@ -77,8 +77,16 @@ end
+ -- Fetches flags for a subject. Yields on the network request. Returns success.
+ function FeatureFlags:reload(playerState): boolean
+     local store = self:_ensureStore(playerState)
++    local generation = (playerState.flagRequestGeneration or 0) + 1
++    playerState.flagRequestGeneration = generation
+     local result = self._transport:fetchFlags(self:_buildBody(playerState))
+ 
++    -- A later request supersedes this one even if it failed: its targeting
++    -- inputs are newer, so this response cannot safely replace the cache.
++    if playerState.flagRequestGeneration ~= generation then
++        return false
++    end
++
+     if result.ok and type(result.body) == "table" then
+         FlagCache.applyResponse(store, result.body)
+         playerState.flagsLoaded = true
+diff --git a/src/Server/FlagCache.luau b/src/Server/FlagCache.luau
+index b855be6..ed8d2ca 100644
+--- a/src/Server/FlagCache.luau
++++ b/src/Server/FlagCache.luau
+@@ -47,11 +47,13 @@ function FlagCache.applyResponse(store, response)
+     store.requestId = response.requestId
+     store.evaluatedAt = response.evaluatedAt
+ 
++    -- Each successful /flags response is a complete evaluation generation.
++    table.clear(store.values)
++    table.clear(store.payloads)
++    table.clear(store.details)
++
+     -- Quota limited: clear everything, keep request metadata.
+     if isNonEmptyArray(response.quotaLimited) then
+-        table.clear(store.values)
+-        table.clear(store.payloads)
+-        table.clear(store.details)
+         return
+     end
+ 
+diff --git a/src/Server/PlayerState.luau b/src/Server/PlayerState.luau
+index 4a03cec..f55e735 100644
+--- a/src/Server/PlayerState.luau
++++ b/src/Server/PlayerState.luau
+@@ -36,6 +36,7 @@ function PlayerState.new(distinctId: string, info: any?): PlayerState
+         -- Feature flags (managed by the FeatureFlags module).
+         flagStore = nil, -- FlagCache store table
+         flagsLoaded = false,
++        flagRequestGeneration = 0,
+         personPropertiesForFlags = {},
+         groupPropertiesForFlags = {}, -- { [groupType]: { [key]: value } }
+         flagCalled = {}, -- dedup set: { ["distinctId:key:value"] = true }
+diff --git a/src/Server/init.luau b/src/Server/init.luau
+index 324caef..0e1136a 100644
+--- a/src/Server/init.luau
++++ b/src/Server/init.luau
+@@ -466,7 +466,13 @@ function PostHog:Group(
+         return
+     end
+     local state, serverScoped = resolveSubject(subject)
++    if state.groups[groupType] ~= nil and state.groups[groupType] ~= groupKey then
++        S.featureFlags:resetGroupProperties(state, groupType)
++    end
+     state:setGroup(groupType, groupKey)
++    if isNonEmpty(groupProperties) then
++        S.featureFlags:setGroupProperties(state, groupType, groupProperties)
++    end
+ 
+     local props = {
+         ["$group_type"] = groupType,

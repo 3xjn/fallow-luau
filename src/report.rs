@@ -5,25 +5,24 @@ use crate::graph::RequireGraph;
 use crate::meta::schema_meta;
 
 pub fn schema_manifest(explain: bool) -> Value {
-    let done = |name: &str, description: &str| {
-        json!({ "name": name, "description": description, "status": "done" })
-    };
+    let done = |name: &str, description: &str| json!({ "name": name, "description": description, "status": "available" });
     let mut v = json!({
         "name": "fallow-luau",
         "manifest_version": "1",
         "schema_version": 1,
         "version": env!("CARGO_PKG_VERSION"),
         "parity_doc": "docs/parity.md",
+        "parity_reviewed_at": "2026-09-27",
         "commands": [
             done("schema", "Dump the capability manifest as JSON"),
             done("list", "List discovered Luau files and the require graph"),
             done("health", "Complexity, file scores, hotspots, targets, score"),
-            done("dead-code", "Unused files, returned keys, locals, types, cycles"),
+            done("dead-code", "Unused files, returned keys, locals, types, cycles, boundary violations"),
             done("dupes", "Token/suffix-array clones across .lua/.luau"),
-            done("audit", "Combined dead-code + health + dupes with verdict"),
+            done("audit", "Combined findings; changed-file new-only or all gate with base attribution"),
             done("explain", "Rule docs for one issue type"),
             done("inspect", "Compose evidence for one file or returned key"),
-            done("trace", "Callers/callees through the require graph"),
+            done("trace", "Literal key reference sites and transitive module dependencies"),
             done("watch", "Re-run audit when files change"),
             done("init", "Emit fallow-luau config"),
             done("config", "Print resolved config"),
@@ -48,7 +47,16 @@ pub fn schema_manifest(explain: bool) -> Value {
             "css", "npm", "typescript-checker", "knip", "jscpd-migrate",
             "fallow-cloud", "react-next-vite", "node-napi", "fix"
         ],
-        "status": "parity-complete"
+        "status": "experimental",
+        "limitations": [
+            "Command availability is not proof of full Fallow parity.",
+            "Dead-code results are candidates: lexical shadowing, module escapes, and indirect imports are not fully modeled.",
+            "Rojo, Roblox instance paths, aliases, and custom resolver plugins are not implemented.",
+            "Boundary zones and suppression directives are enforced. Stale-marker hygiene, rule severities and per-file health thresholds are not implemented.",
+            "Trace resolves literal imported-key references, not a whole-program call graph. Static coverage estimates are not runtime coverage.",
+            "Audit attribution uses structural keys at the explicit base ref; rename mapping and added-line clone demotion are not implemented.",
+            "Impact/review briefs, semantic clone modes, runtime coverage, and automatic fixes are not implemented."
+        ]
     });
     if explain {
         v.as_object_mut()

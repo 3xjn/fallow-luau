@@ -1,0 +1,35 @@
+Review the production Luau code in your assigned checkout for real behavior
+defects and worthwhile refactors. Read local documentation and the existing
+tests, and run the baseline test command. Cover the production modules; do not
+stop after finding one repair. There is no quota of findings. Do not manufacture
+suggestions when the code is adequate.
+
+For each suggestion identify the concrete current problem, affected symbols,
+expected behavior or maintenance benefit, smallest proposed change, compatibility
+risks, and evidence. Behavior defects need executable reproductions against the
+unchanged source and an explanation of why the expected behavior is justified.
+Refactors need a specific existing maintenance problem and a concrete simpler
+design with characterization coverage; style preferences and a lower metric
+alone do not qualify. Distinguish defects from refactors and uncertainty from
+facts. Record discarded false leads and which evidence led you to each finding.
+
+This is the review phase: do not edit production source. You may add isolated
+reproduction or characterization scripts/tests. Write REVIEW.md with your
+findings, exact commands and observations, reviewed production files, and any
+coverage gaps. Stop when that review and evidence are complete. Implementation
+will follow after independent adjudication.
+
+Do not inspect sibling checkouts, evaluation results, online issues, or git
+history. Do not read this parent project's files or instructions. Only your
+assigned checkout and explicitly supplied analyzer binary (if any) are inputs.
+You are not alone in the workspace: edit only your assigned checkout and do
+not revert anyone else's work. Do not delegate, contact third parties, push,
+or open PRs. Use ordinary source/search/shell tools and local project tests.
+
+Assigned checkout: C:\Users\asher\Documents\ChatGPT\fallow-luau/target/evaluation/round3/brickblast-assisted
+Scope: production Luau modules under src/shared/game, with their existing tests and relevant local documentation. The client/server/UI integration is outside this headless comparison. Read the checkout's AGENTS.md; all experimental changes must remain local.
+Baseline test command: lune run scripts/run-tests.luau (preflight passed 14 modules / 195 tests).
+Lune executable: C:/Users/asher/.cargo/bin/lune.exe
+Analyzer: C:\Users\asher\Documents\ChatGPT\fallow-luau/target/evaluation/round2/bin/fallow-luau.exe
+Start with health --root src/shared/game --complexity --file-scores --explain. Use inspect, dupes, list or other documented commands when relevant. Treat metrics as navigation hints, never proof of a bug or permission to delete code. Roblox instance imports are unresolved. Verify hypotheses in source and tests. Record helpful and misleading output. Do not read analyzer source.
+

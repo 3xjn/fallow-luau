@@ -1,0 +1,7 @@
+initial effect error true false | C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-assisted\src:204: attempt to call a string value
+computed error true false | C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-assisted\src:86: C:\Users\asher\Documents\ChatGPT\fallow-luau\target/evaluation/round2/replay-alien-signals-assisted/tests/review_repro:19: computed failure
+rerun effect error true false | C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-assisted\src:52: attempt to call a string value
+scope error true false | C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-assisted\src:219: attempt to call a string value
+nested pause true 2
+nested scope disposal true 2
+direct scope disposal control true 1

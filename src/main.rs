@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand, ValueEnum};
 use fallow_luau::{
     analyze_audit, analyze_dead_code, analyze_dupes, analyze_flags, analyze_project,
-    build_require_graph, collect_suppressions, discover_files, explain_rule, init_config,
-    inspect_target, list_report, load_config, render_saved_report, run_mcp_stdio, schema_manifest,
-    trace_symbol, watch_loop, write_viz, AuditOptions, DeadCodeOptions, DupesOptions, HealthOptions,
-    InitFormat, ProjectOptions, ReportFormat,
+    build_require_graph, collect_suppressions, discover_configured_files, explain_rule,
+    init_config, inspect_target, list_report, load_config, render_saved_report, run_mcp_stdio,
+    schema_manifest, trace_symbol, watch_loop, write_viz, AuditOptions, DeadCodeOptions,
+    DupesOptions, HealthOptions, InitFormat, ProjectOptions, ReportFormat,
 };
 
 #[derive(Parser)]
@@ -39,12 +39,14 @@ enum Command {
         targets: bool,
         #[arg(long, default_value_t = false)]
         score: bool,
-        #[arg(long, default_value_t = 20)]
-        max_cyclomatic: u32,
-        #[arg(long, default_value_t = 15)]
-        max_cognitive: u32,
-        #[arg(long, default_value_t = 60)]
-        max_unit_size: usize,
+        #[arg(long)]
+        max_cyclomatic: Option<u32>,
+        #[arg(long)]
+        max_cognitive: Option<u32>,
+        #[arg(long)]
+        max_crap: Option<f64>,
+        #[arg(long)]
+        max_unit_size: Option<usize>,
         #[arg(long, default_value_t = 180.0)]
         since_days: f64,
         #[arg(long)]
@@ -60,16 +62,21 @@ enum Command {
         entries: Vec<String>,
     },
     Dupes {
-        #[arg(long, default_value_t = 30)]
-        min_tokens: usize,
-        #[arg(long, default_value_t = 5)]
-        min_lines: usize,
+        #[arg(long)]
+        min_tokens: Option<usize>,
+        #[arg(long)]
+        min_lines: Option<usize>,
     },
     Audit {
         #[arg(long)]
         changed_since: Option<String>,
+        /// With --changed-since, gate new findings or all findings in changed files.
+        #[arg(long, default_value = "new-only", value_parser = ["new-only", "all"])]
+        gate: String,
     },
-    Explain { id: String },
+    Explain {
+        id: String,
+    },
     Inspect {
         /// File path (relative to --root)
         path: String,
@@ -130,7 +137,16 @@ enum ReportCliFormat {
 
 fn main() {
     let cli = Cli::parse();
-    if let Err(err) = run(cli) {
+    // Match the project's existing .cargo/config.toml test stack. Real project
+    // ASTs also exceed the Windows executable's default main-thread stack.
+    let result = std::thread::Builder::new()
+        .name("analysis".into())
+        .stack_size(8_388_608)
+        .spawn(move || run(cli))
+        .expect("start analysis thread")
+        .join()
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+    if let Err(err) = result {
         eprintln!("error: {err}");
         std::process::exit(1);
     }
@@ -147,7 +163,7 @@ fn run(cli: Cli) -> Result<(), String> {
         }
         Command::List => {
             let root = canon(&cli.root)?;
-            let files = discover_files(&root);
+            let files = discover_configured_files(&root)?;
             let graph = build_require_graph(&root, &files)?;
             println!(
                 "{}",
@@ -168,6 +184,7 @@ fn run(cli: Cli) -> Result<(), String> {
             score,
             max_cyclomatic,
             max_cognitive,
+            max_crap,
             max_unit_size,
             since_days,
             baseline,
@@ -175,10 +192,12 @@ fn run(cli: Cli) -> Result<(), String> {
             format: _,
         } => {
             let any = complexity || file_scores || hotspots || targets || score;
+            let config = load_config(&cli.root)?.config;
             let mut health = HealthOptions {
-                max_cyclomatic,
-                max_cognitive,
-                max_unit_size,
+                max_cyclomatic: max_cyclomatic.unwrap_or(config.health.max_cyclomatic),
+                max_cognitive: max_cognitive.unwrap_or(config.health.max_cognitive),
+                max_unit_size: max_unit_size.unwrap_or(config.health.max_unit_size),
+                max_crap: max_crap.unwrap_or(config.health.max_crap),
                 explain: cli.explain,
                 since_days,
                 score: if any { score } else { true },
@@ -196,31 +215,13 @@ fn run(cli: Cli) -> Result<(), String> {
                     health.file_scores = true;
                 }
             }
-            let root = canon(&cli.root)?;
-            let files = discover_files(&root);
-            let graph = build_require_graph(&root, &files)?;
-            let dead = analyze_dead_code(&root, &files, &graph, &DeadCodeOptions::default())?;
-            health.dead_ratio_override = Some(dead.dead_ratio_by_file.clone());
-            health.dead_file_count = Some(dead.unused_files.len());
-            health.dead_export_count = Some(dead.unused_exports.len());
-            health.total_export_count = Some(
-                dead.dead_ratio_by_file
-                    .keys()
-                    .count()
-                    .max(dead.unused_exports.len()),
-            );
-            health.circular_deps = Some(dead.cycles.len());
-            let dupes = analyze_dupes(&root, &files, &DupesOptions::default())?;
-            health.duplication_pct = Some(dupes.stats.duplication_percentage);
-
-            let (_project, report) =
-                analyze_project(&cli.root, &ProjectOptions { health })?;
+            let (_project, report) = analyze_project(&cli.root, &ProjectOptions { health })?;
             println!("{}", serde_json::to_string_pretty(&report).unwrap());
             Ok(())
         }
         Command::DeadCode { entries } => {
             let root = canon(&cli.root)?;
-            let files = discover_files(&root);
+            let files = discover_configured_files(&root)?;
             let graph = build_require_graph(&root, &files)?;
             let report = analyze_dead_code(
                 &root,
@@ -239,43 +240,53 @@ fn run(cli: Cli) -> Result<(), String> {
             min_lines,
         } => {
             let root = canon(&cli.root)?;
-            let files = discover_files(&root);
+            let files = discover_configured_files(&root)?;
+            let config = load_config(&root)?.config;
             let report = analyze_dupes(
                 &root,
                 &files,
                 &DupesOptions {
                     explain: cli.explain,
-                    min_tokens,
-                    min_lines,
+                    min_tokens: min_tokens.unwrap_or(config.duplicates.min_tokens),
+                    min_lines: min_lines.unwrap_or(config.duplicates.min_lines),
                     ..DupesOptions::default()
                 },
             )?;
             println!("{}", serde_json::to_string_pretty(&report).unwrap());
             Ok(())
         }
-        Command::Audit { changed_since } => {
+        Command::Audit {
+            changed_since,
+            gate,
+        } => {
             let report = analyze_audit(
                 &cli.root,
                 &AuditOptions {
                     explain: cli.explain,
                     changed_since,
-                    ..AuditOptions::default()
+                    gate: if gate == "all" {
+                        fallow_luau::AuditGate::All
+                    } else {
+                        fallow_luau::AuditGate::NewOnly
+                    },
+                    ..AuditOptions::configured(&cli.root)?
                 },
             )?;
             println!("{}", serde_json::to_string_pretty(&report).unwrap());
+            if report.verdict == fallow_luau::AuditVerdict::Fail {
+                return Err("audit failed; see JSON findings".into());
+            }
             Ok(())
         }
         Command::Explain { id } => {
-            println!("{}", serde_json::to_string_pretty(&explain_rule(&id)).unwrap());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&explain_rule(&id)).unwrap()
+            );
             Ok(())
         }
         Command::Inspect { path, symbol } => {
-            let report = inspect_target(
-                &cli.root,
-                &path,
-                symbol.as_deref(),
-                cli.explain,
-            )?;
+            let report = inspect_target(&cli.root, &path, symbol.as_deref(), cli.explain)?;
             println!("{}", serde_json::to_string_pretty(&report).unwrap());
             Ok(())
         }

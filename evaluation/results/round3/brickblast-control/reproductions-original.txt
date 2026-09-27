@@ -1,0 +1,4 @@
+fractional placement: false false 0 nil false false
+fractional board child: true 0 64
+NaN board child: true 0 64
+perfectClearSetup one-move perfect clears: 0 

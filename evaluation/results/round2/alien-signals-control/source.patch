@@ -1,0 +1,85 @@
+diff --git a/src/init.luau b/src/init.luau
+index 3e9cc59..cc8f3dc 100644
+--- a/src/init.luau
++++ b/src/init.luau
+@@ -45,11 +45,11 @@ local function notifyEffect(e: Effect): boolean
+ 		local prevSub = activeSub
+ 		activeSub = e
+ 		startTracking(e)
+-		local success, error = pcall(e.fn)
++		local success, err = pcall(e.fn)
+ 		activeSub = prevSub
+ 		endTracking(e)
+ 		if not success then
+-			error(error)
++			error(err)
+ 		end
+ 	else
+ 		processPendingInnerEffects(e, e.flags)
+@@ -151,7 +151,7 @@ local function signalGetterSetter<T>(this: Signal<T>): (() -> T?, (value: T) ->
+ 	return getter, setter
+ end
+ 
+-local pauseStack: { Subscriber? } = {}
++local pauseStack: { { sub: Subscriber? } } = {}
+ 
+ local function startBatch()
+ 	batchDepth += 1
+@@ -165,12 +165,13 @@ local function endBatch()
+ end
+ 
+ local function pauseTracking()
+-	table.insert(pauseStack, activeSub)
++	table.insert(pauseStack, { sub = activeSub })
+ 	activeSub = nil
+ end
+ 
+ local function resumeTracking()
+-	activeSub = table.remove(pauseStack)
++	local frame = table.remove(pauseStack)
++	activeSub = if frame then frame.sub else nil
+ end
+ 
+ local function signal<T>(intialValue: T?): (() -> T?, (value: T?) -> ())
+@@ -191,17 +192,19 @@ local function effect<T>(fn: () -> T): () -> ()
+ 		fn = fn,
+ 		flags = Effect,
+ 	}
+-	if activeSub then
+-		link(e, activeSub)
+-	elseif activeScope then
+-		link(e, activeScope)
+-	end
+ 	local prevSub = activeSub
+ 	activeSub = e
+-	local success, error = pcall(e.fn)
++	local success, err = pcall(e.fn)
+ 	activeSub = prevSub
+ 	if not success then
+-		error(error)
++		startTracking(e)
++		endTracking(e)
++		error(err)
++	end
++	if activeSub then
++		link(e, activeSub)
++	elseif activeScope then
++		link(e, activeScope)
+ 	end
+ 	return effectStop(e)
+ end
+@@ -213,10 +216,12 @@ local function effectScope<T>(fn: () -> T): () -> ()
+ 	}
+ 	local prevSub = activeScope
+ 	activeScope = e
+-	local success, error = pcall(fn)
++	local success, err = pcall(fn)
+ 	activeScope = prevSub
+ 	if not success then
+-		error(error)
++		startTracking(e)
++		endTracking(e)
++		error(err)
+ 	end
+ 	return effectStop(e)
+ end

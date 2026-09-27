@@ -1,0 +1,9 @@
+flag reload retired value: true
+flag reload retired payload: true
+flag reload live value: false
+queue sent: a,b
+queue remaining: 0
+flags after newer request: new
+flags after older request completes: old
+Group-derived flags membership: guild_42
+Group-derived flags properties: nil

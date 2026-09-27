@@ -1,0 +1,81 @@
+   Compiling fallow-luau v0.1.0 (C:\Users\asher\Documents\ChatGPT\fallow-luau)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.76s
+     Running unittests src\lib.rs (target\debug\deps\fallow_luau-122d3993abe2effc.exe)
+
+running 8 tests
+test discover::tests::test_path_heuristics ... ok
+test health::tests::crap_untested ... ok
+test health::tests::half_life_weights ... ok
+test health::tests::mi_formula ... ok
+test complexity::tests::flat_if_elseif_chain ... ok
+test complexity::tests::nested_local_function_is_its_own_unit ... ok
+test resolve::tests::resolves_relative_luau ... ok
+test discover::tests::discovers_lua_and_luau ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\debug\deps\fallow_luau-22c47982d2463191.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\fixtures_health.rs (target\debug\deps\fixtures_health-4e2ddd32dc8bea3b.exe)
+
+running 9 tests
+test schema_lists_core_commands ... ok
+test require_graph_resolves_string_literals ... ok
+test dynamic_require_is_unresolved_edge ... ok
+test list_report_includes_meta_when_explain ... ok
+test density_and_mi_on_dense_fixture ... ok
+test hotspots_use_normalized_churn_and_density ... ok
+test static_estimated_coverage_from_test_require ... ok
+test nested_inner_function_scored_despite_large_file ... ok
+test sig_unit_size_profile_present ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\fixtures_parity.rs (target\debug\deps\fixtures_parity-048c124068782f5c.exe)
+
+running 6 tests
+test explain_unused_file ... ok
+test schema_lists_parity_commands ... ok
+test dupes_finds_cloned_score_fn ... ok
+test cycles_detected ... ok
+test dead_code_finds_unused_file_export_and_local ... ok
+test audit_runs_on_dead_code_fixture ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\fixtures_rest.rs (target\debug\deps\fixtures_rest-46ecec1e2debf5b7.exe)
+
+running 8 tests
+test schema_discloses_experimental_status_and_available_commands ... ok
+test suppressions_inventory ... ok
+test flags_detect_ff_and_settings ... ok
+test init_and_config_roundtrip ... ok
+test unused_type_detected ... ok
+test health_score_present ... ok
+test viz_html_contains_nodes ... ok
+test inspect_and_trace_require_graph ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\regressions.rs (target\debug\deps\regressions-e36c6fa29eea6f82.exe)
+
+running 6 tests
+test duplicate_lines_are_a_union_of_reported_ranges ... ok
+test used_type_is_not_reported_unused ... ok
+test long_string_requires_resolve ... ok
+test returned_code_is_scored_and_returned_locals_are_live ... ok
+test mcp_accepts_ndjson_and_matches_cli_health ... ok
+test config_controls_discovery_entries_and_thresholds_with_cli_override ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+   Doc-tests fallow_luau
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

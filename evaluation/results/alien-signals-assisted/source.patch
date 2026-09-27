@@ -1,0 +1,30 @@
+diff --git a/src/init.luau b/src/init.luau
+index 3e9cc59..6ed3784 100644
+--- a/src/init.luau
++++ b/src/init.luau
+@@ -152,6 +152,7 @@ local function signalGetterSetter<T>(this: Signal<T>): (() -> T?, (value: T) ->
+ end
+ 
+ local pauseStack: { Subscriber? } = {}
++local pauseStackDepth = 0
+ 
+ local function startBatch()
+ 	batchDepth += 1
+@@ -165,12 +166,15 @@ local function endBatch()
+ end
+ 
+ local function pauseTracking()
+-	table.insert(pauseStack, activeSub)
++	pauseStackDepth += 1
++	pauseStack[pauseStackDepth] = activeSub
+ 	activeSub = nil
+ end
+ 
+ local function resumeTracking()
+-	activeSub = table.remove(pauseStack)
++	activeSub = pauseStack[pauseStackDepth]
++	pauseStack[pauseStackDepth] = nil
++	pauseStackDepth -= 1
+ end
+ 
+ local function signal<T>(intialValue: T?): (() -> T?, (value: T?) -> ())

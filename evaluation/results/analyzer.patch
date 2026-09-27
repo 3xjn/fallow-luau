@@ -1,0 +1,1078 @@
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 6616996..83a0618 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -108,6 +108,9 @@ jobs:
+         shell: bash
+         run: cargo build --release --target "${{ matrix.target }}" --bin fallow-luau
+ 
++      - name: Test
++        run: cargo test --locked
++
+       - name: Package
+         shell: bash
+         env:
+diff --git a/Cargo.lock b/Cargo.lock
+index 6537881..14be358 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -2,6 +2,15 @@
+ # It is not intended for manual editing.
+ version = 4
+ 
++[[package]]
++name = "aho-corasick"
++version = "1.1.5"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
++dependencies = [
++ "memchr",
++]
++
+ [[package]]
+ name = "anstream"
+ version = "1.0.0"
+@@ -74,6 +83,16 @@ dependencies = [
+  "cfg_aliases",
+ ]
+ 
++[[package]]
++name = "bstr"
++version = "1.13.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "6bb31b46c14244e20ee9984b11bf5c992b91fb6939fea616e3512c8baecdbe5f"
++dependencies = [
++ "memchr",
++ "serde_core",
++]
++
+ [[package]]
+ name = "bytecount"
+ version = "0.6.9"
+@@ -187,6 +206,7 @@ version = "0.1.0"
+ dependencies = [
+  "clap",
+  "full_moon",
++ "globset",
+  "serde",
+  "serde_json",
+  "tempfile",
+@@ -238,6 +258,19 @@ dependencies = [
+  "r-efi",
+ ]
+ 
++[[package]]
++name = "globset"
++version = "0.4.20"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "07c34a9410465b45bd9787443bc7370f37735bad04b0f0cd57ff1a3186c98988"
++dependencies = [
++ "aho-corasick",
++ "bstr",
++ "log",
++ "regex-automata",
++ "regex-syntax",
++]
++
+ [[package]]
+ name = "hashbrown"
+ version = "0.12.3"
+@@ -300,6 +333,12 @@ version = "0.12.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+ 
++[[package]]
++name = "log"
++version = "0.4.34"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
++
+ [[package]]
+ name = "memchr"
+ version = "2.8.3"
+@@ -348,6 +387,23 @@ version = "6.0.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+ 
++[[package]]
++name = "regex-automata"
++version = "0.4.18"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
++dependencies = [
++ "aho-corasick",
++ "memchr",
++ "regex-syntax",
++]
++
++[[package]]
++name = "regex-syntax"
++version = "0.8.11"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
++
+ [[package]]
+ name = "rustix"
+ version = "1.1.4"
+diff --git a/Cargo.toml b/Cargo.toml
+index 7f35dcd..37600ab 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -24,6 +24,7 @@ full_moon = { version = "2", features = ["luau"] }
+ serde = { version = "1", features = ["derive"] }
+ serde_json = "1"
+ walkdir = "2"
++globset = "0.4"
+ toml = "0.8"
+ 
+ [dev-dependencies]
+diff --git a/README.md b/README.md
+index c1539f2..ee4e686 100644
+--- a/README.md
++++ b/README.md
+@@ -89,8 +89,8 @@ fallow-luau schema
+ 
+ `--explain` puts metric definitions in a `_meta` object on the JSON so you (or an agent) do not need a second lookup.
+ 
+-Right now the 1:1 Luau surface is in place: parse, require graph, health (incl. score/baselines), dead-code, dupes, audit, explain, inspect, trace, watch, init/config, suppressions, report, flags, viz, and MCP. See [`docs/parity.md`](docs/parity.md). Scoring notes in [`docs/health.md`](docs/health.md).
++The command surface is implemented but experimental; full Fallow parity and agent productivity gains are not established. Use metrics to navigate code, then verify findings with source and tests. See [`docs/parity.md`](docs/parity.md) for limitations, [`docs/health.md`](docs/health.md) for scoring, and [`evaluation/README.md`](evaluation/README.md) for the controlled agent-value pilot.
+ 
+ ## Publishing notes (maintainers)
+ 
+-Bump `version` in `Cargo.toml` (and run `scripts/sync-npm-version.sh` if publishing npm). Merge to `main` — the [release workflow](.github/workflows/release.yml) creates tag `v$VERSION` and uploads binaries automatically when that tag does not already exist.
+\ No newline at end of file
++Bump `version` in `Cargo.toml` (and run `scripts/sync-npm-version.sh` if publishing npm). Merge to `main` — the [release workflow](.github/workflows/release.yml) creates tag `v$VERSION` and uploads binaries automatically when that tag does not already exist.
+diff --git a/src/audit.rs b/src/audit.rs
+index 637138c..de8a36b 100644
+--- a/src/audit.rs
++++ b/src/audit.rs
+@@ -7,7 +7,7 @@ use std::process::Command;
+ use serde::Serialize;
+ 
+ use crate::dead_code::{analyze_dead_code, DeadCodeOptions, DeadCodeReport};
+-use crate::discover::discover_files;
++use crate::discover::discover_configured_files;
+ use crate::dupes::{analyze_dupes, DupesOptions, DupesReport};
+ use crate::graph::build_require_graph;
+ use crate::health::{analyze_health, FileAnalysis, HealthOptions, HealthReport};
+@@ -25,6 +25,17 @@ pub struct AuditOptions {
+     pub dupes: DupesOptions,
+ }
+ 
++impl AuditOptions {
++    pub fn configured(root: &Path) -> Result<Self, String> {
++        let config = crate::config::load_config(root)?.config;
++        Ok(Self {
++            health: config.health_options(),
++            dupes: config.dupes_options(),
++            ..Default::default()
++        })
++    }
++}
++
+ #[derive(Debug, Clone, Serialize)]
+ pub struct AuditReport {
+     pub schema_version: u32,
+@@ -50,7 +61,7 @@ pub fn analyze_audit(root: &Path, opts: &AuditOptions) -> Result<AuditReport, St
+     let root = root
+         .canonicalize()
+         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+-    let all_files = discover_files(&root);
++    let all_files = discover_configured_files(&root)?;
+     let changed = opts
+         .changed_since
+         .as_ref()
+@@ -71,7 +82,7 @@ pub fn analyze_audit(root: &Path, opts: &AuditOptions) -> Result<AuditReport, St
+     // when changed-scoped, build on the scoped set (best-effort gate).
+     let graph_files = if changed.is_some() {
+         // Include requires of changed files: use full discover for graph, filter findings later
+-        discover_files(&root)
++        discover_configured_files(&root)?
+     } else {
+         files.clone()
+     };
+@@ -106,11 +117,16 @@ pub fn analyze_audit(root: &Path, opts: &AuditOptions) -> Result<AuditReport, St
+     let mut health_opts = opts.health.clone();
+     health_opts.explain = false;
+     health_opts.dead_ratio_override = Some(dead.dead_ratio_by_file.clone());
+-    let health = analyze_health(&root, &analyses, &graph, &health_opts);
+ 
+     let mut dupes_opts = opts.dupes.clone();
+     dupes_opts.explain = false;
+     let dupes = analyze_dupes(&root, analysis_files, &dupes_opts)?;
++    health_opts.dead_file_count = Some(dead.unused_files.len());
++    health_opts.dead_export_count = Some(dead.unused_exports.len());
++    health_opts.total_export_count = Some(dead.total_exports);
++    health_opts.circular_deps = Some(dead.cycles.len());
++    health_opts.duplication_pct = Some(dupes.stats.duplication_percentage);
++    let health = analyze_health(&root, &analyses, &graph, &health_opts);
+ 
+     let verdict = {
+         let fail = !dead.unused_files.is_empty()
+diff --git a/src/complexity.rs b/src/complexity.rs
+index d7b37f0..1b9f703 100644
+--- a/src/complexity.rs
++++ b/src/complexity.rs
+@@ -115,6 +115,11 @@ fn collect_block(block: &Block, stack: &mut Vec<String>, out: &mut Vec<FunctionM
+     for stmt in block.stmts() {
+         collect_stmt(stmt, stack, out);
+     }
++    if let Some(full_moon::ast::LastStmt::Return(ret)) = block.last_stmt() {
++        for expr in ret.returns() {
++            collect_expression(expr, stack, out);
++        }
++    }
+ }
+ 
+ fn collect_stmt(stmt: &Stmt, stack: &mut Vec<String>, out: &mut Vec<FunctionMetrics>) {
+@@ -361,6 +366,11 @@ impl ComplexityScorer {
+         for stmt in block.stmts() {
+             self.score_stmt(stmt, nesting);
+         }
++        if let Some(full_moon::ast::LastStmt::Return(ret)) = block.last_stmt() {
++            for expr in ret.returns() {
++                self.score_expression(expr, nesting);
++            }
++        }
+     }
+ 
+     fn score_stmt(&mut self, stmt: &Stmt, nesting: u32) {
+diff --git a/src/config.rs b/src/config.rs
+index a03450a..d70b299 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -18,6 +18,36 @@ pub struct Config {
+     pub boundaries: Vec<BoundaryZone>,
+ }
+ 
++impl Config {
++    pub fn health_options(&self) -> crate::health::HealthOptions {
++        crate::health::HealthOptions {
++            max_cyclomatic: self.health.max_cyclomatic,
++            max_cognitive: self.health.max_cognitive,
++            max_unit_size: self.health.max_unit_size,
++            score: true,
++            ..Default::default()
++        }
++    }
++
++    pub fn dupes_options(&self) -> crate::dupes::DupesOptions {
++        crate::dupes::DupesOptions {
++            min_tokens: self.duplicates.min_tokens,
++            min_lines: self.duplicates.min_lines,
++            ..Default::default()
++        }
++    }
++}
++
++pub(crate) fn path_patterns(patterns: &[String]) -> Result<globset::GlobSet, String> {
++    let mut builder = globset::GlobSetBuilder::new();
++    for pattern in patterns {
++        let pattern = pattern.replace('\\', "/");
++        builder.add(globset::GlobBuilder::new(&pattern)
++            .literal_separator(true).build().map_err(|e| format!("invalid glob {pattern}: {e}"))?);
++    }
++    builder.build().map_err(|e| e.to_string())
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct HealthConfig {
+     #[serde(default = "default_max_cyclomatic")]
+diff --git a/src/dead_code.rs b/src/dead_code.rs
+index 5545692..78bb6b9 100644
+--- a/src/dead_code.rs
++++ b/src/dead_code.rs
+@@ -16,6 +16,7 @@ use full_moon::ast::{
+ };
+ use full_moon::node::Node;
+ use full_moon::parse;
++use full_moon::visitors::Visitor;
+ use serde::Serialize;
+ 
+ use crate::discover::is_test_path;
+@@ -55,6 +56,7 @@ pub struct DeadCodeReport {
+     pub unused_exports: Vec<DeadCodeFinding>,
+     pub unused_locals: Vec<DeadCodeFinding>,
+     pub unused_types: Vec<DeadCodeFinding>,
++    pub total_exports: usize,
+     pub cycles: Vec<CycleInfo>,
+     pub findings: Vec<DeadCodeFinding>,
+     /// path → dead_code_ratio (unused returned keys / total returned keys)
+@@ -79,7 +81,15 @@ pub fn analyze_dead_code(
+     let root = root
+         .canonicalize()
+         .unwrap_or_else(|_| root.to_path_buf());
+-    let entries = detect_entry_points(&root, files, graph, &opts.extra_entries);
++    let config = crate::config::load_config(&root)?.config;
++    let mut entry_patterns = config.entry;
++    entry_patterns.extend(opts.extra_entries.clone());
++    let matcher = crate::config::path_patterns(&entry_patterns)?;
++    let matched: Vec<_> = graph.files.iter().filter(|f| matcher.is_match(f)).cloned().collect();
++    if !entry_patterns.is_empty() && matched.is_empty() {
++        return Err("entry patterns did not match any analyzed files".into());
++    }
++    let entries = detect_entry_points(&root, files, graph, &matched);
+     let reachable = reachability(graph, &entries);
+     let mut unused_files: Vec<String> = graph
+         .files
+@@ -120,9 +130,8 @@ pub fn analyze_dead_code(
+         let refs = key_refs.get(path).cloned().unwrap_or_default();
+         let mut unused = 0usize;
+         for (name, line) in &info.exports {
+-            // Entry modules and test files keep public surface unless never self-used
+-            // and never referenced — still report if zero refs from anywhere.
+-            if !refs.contains(name) {
++            // An entry module's public API may be used outside this project.
++            if !entries.contains(path) && !refs.contains(name) {
+                 unused += 1;
+                 unused_exports.push(DeadCodeFinding {
+                     path: path.clone(),
+@@ -157,15 +166,7 @@ pub fn analyze_dead_code(
+     let mut unused_types = Vec::new();
+     for (path, info) in &modules {
+         for (name, line) in &info.type_decls {
+-            // A type is used if referenced by another type name in the file (excluding itself).
+-            let used = info
+-                .type_refs
+-                .iter()
+-                .any(|r| r == name)
+-                && info.type_decls.iter().filter(|(n, _)| n == name).count() >= 1;
+-            // refs include the declaration identifier; require a second mention OR cross-decl use.
+-            let mention_count = info.type_refs.iter().filter(|r| *r == name).count();
+-            if mention_count <= 1 {
++            if !info.type_refs.contains(name) {
+                 unused_types.push(DeadCodeFinding {
+                     path: path.clone(),
+                     kind: DeadKind::UnusedType,
+@@ -174,7 +175,6 @@ pub fn analyze_dead_code(
+                     message: format!("type `{name}` is never referenced"),
+                 });
+             }
+-            let _ = used;
+         }
+     }
+     unused_types.sort_by(|a, b| (&a.path, a.line, &a.name).cmp(&(&b.path, b.line, &b.name)));
+@@ -212,6 +212,7 @@ pub fn analyze_dead_code(
+         unused_exports,
+         unused_locals,
+         unused_types,
++        total_exports: modules.values().map(|m| m.exports.len()).sum(),
+         cycles,
+         findings,
+         dead_ratio_by_file,
+@@ -237,11 +238,11 @@ fn detect_entry_points(
+             .and_then(|n| n.to_str())
+             .unwrap_or("")
+             .to_lowercase();
+-        if name == "init.lua"
++        if extra.is_empty() && (name == "init.lua"
+             || name == "init.luau"
+             || name == "main.lua"
+             || name == "main.luau"
+-            || name.starts_with("main.")
++            || name.starts_with("main."))
+         {
+             entries.insert(rel);
+         }
+@@ -343,7 +344,8 @@ fn collect_types(
+     ast: &full_moon::ast::Ast,
+ ) -> (Vec<(String, usize)>, std::collections::HashSet<String>) {
+     let mut decls = Vec::new();
+-    let mut refs = std::collections::HashSet::new();
++    let mut refs = TypeReferences::default();
++    refs.visit_ast(ast);
+     for stmt in ast.nodes().stmts() {
+         match stmt {
+             Stmt::TypeDeclaration(td) => {
+@@ -354,39 +356,26 @@ fn collect_types(
+                     .map(|p| p.line())
+                     .unwrap_or(1);
+                 decls.push((name, line));
+-                collect_type_refs_from_decl(td, &mut refs);
+-            }
+-            Stmt::ExportedTypeDeclaration(et) => {
+-                let td = et.type_declaration();
+-                let name = td.type_name().token().to_string();
+-                let line = td
+-                    .type_name()
+-                    .start_position()
+-                    .map(|p| p.line())
+-                    .unwrap_or(1);
+-                decls.push((name, line));
+-                collect_type_refs_from_decl(td, &mut refs);
+             }
++            // Exported types can be consumed outside the analyzed project.
++            Stmt::ExportedTypeDeclaration(_) => {}
+             _ => {}
+         }
+     }
+-    // Also scan source-ish type assertions via display tokens — type refs inside
+-    // declarations already collected; strip self-refs below.
+-    (decls, refs)
++    (decls, refs.0)
+ }
+ 
+-fn collect_type_refs_from_decl(
+-    td: &full_moon::ast::luau::TypeDeclaration,
+-    refs: &mut std::collections::HashSet<String>,
+-) {
+-    // Walk the type info display string for Identifier-like tokens is fragile;
+-    // use Node tokens in the type definition subtree.
+-    for token in td.tokens() {
+-        if let full_moon::tokenizer::TokenType::Identifier { identifier } = token.token_type() {
+-            let s = identifier.to_string();
+-            // Skip the declared name itself when it appears as the left-hand side —
+-            // callers remove self after.
+-            refs.insert(s);
++#[derive(Default)]
++struct TypeReferences(HashSet<String>);
++
++impl Visitor for TypeReferences {
++    fn visit_type_info(&mut self, info: &full_moon::ast::luau::TypeInfo) {
++        use full_moon::ast::luau::TypeInfo;
++        match info {
++            TypeInfo::Basic(token) | TypeInfo::Generic { base: token, .. } => {
++                self.0.insert(token.token().to_string());
++            }
++            _ => {}
+         }
+     }
+ }
+@@ -456,6 +445,11 @@ fn walk_block_locals(
+     for stmt in block.stmts() {
+         walk_stmt_locals(stmt, declared, reads, scope);
+     }
++    if let Some(full_moon::ast::LastStmt::Return(ret)) = block.last_stmt() {
++        for expr in ret.returns() {
++            walk_expr_reads(expr, reads);
++        }
++    }
+ }
+ 
+ fn walk_stmt_locals(
+@@ -502,7 +496,12 @@ fn walk_stmt_locals(
+             for expr in a.expressions() {
+                 walk_expr_reads(expr, reads);
+             }
+-            // LHS names count as writes, not reads
++            // An indexed write reads the table and any index expression.
++            for var in a.variables() {
++                if matches!(var, Var::Expression(_)) {
++                    walk_var_reads(var, reads);
++                }
++            }
+         }
+         Stmt::FunctionCall(call) => walk_call_reads(call, reads),
+         Stmt::If(i) => {
+@@ -543,7 +542,10 @@ fn walk_stmt_locals(
+             walk_block_locals(f.block(), declared, reads, scope);
+         }
+         Stmt::Do(d) => walk_block_locals(d.block(), declared, reads, scope),
+-        Stmt::CompoundAssignment(c) => walk_expr_reads(c.rhs(), reads),
++        Stmt::CompoundAssignment(c) => {
++            walk_var_reads(c.lhs(), reads);
++            walk_expr_reads(c.rhs(), reads);
++        }
+         _ => {}
+     }
+ }
+@@ -761,6 +763,11 @@ fn scan_requires_and_refs(
+             _ => {}
+         }
+     }
++    if let Some(full_moon::ast::LastStmt::Return(ret)) = block.last_stmt() {
++        for expr in ret.returns() {
++            scan_expr_refs(expr, from_rel, edges, bindings, refs);
++        }
++    }
+ }
+ 
+ fn require_target(
+diff --git a/src/discover.rs b/src/discover.rs
+index b6c577e..3507dec 100644
+--- a/src/discover.rs
++++ b/src/discover.rs
+@@ -2,6 +2,15 @@ use std::path::{Path, PathBuf};
+ 
+ use walkdir::WalkDir;
+ 
++/// Discovery for analysis commands: validate config and apply project ignore globs.
++pub fn discover_configured_files(root: &Path) -> Result<Vec<PathBuf>, String> {
++    let config = crate::config::load_config(root)?.config;
++    let ignored = crate::config::path_patterns(&config.ignore)?;
++    Ok(discover_files(root).into_iter().filter(|file| {
++        !ignored.is_match(crate::graph::display_rel(root, file))
++    }).collect())
++}
++
+ /// Return true when `path` looks like Luau/Lua source.
+ pub fn is_luau_source(path: &Path) -> bool {
+     match path.extension().and_then(|e| e.to_str()) {
+diff --git a/src/dupes.rs b/src/dupes.rs
+index cf492ce..182c2c2 100644
+--- a/src/dupes.rs
++++ b/src/dupes.rs
+@@ -197,21 +197,17 @@ pub fn analyze_dupes(
+             .then_with(|| a.fingerprint.cmp(&b.fingerprint))
+     });
+ 
+-    let mut duplicated_lines = 0usize;
+-    let mut seen_spans = BTreeMap::<(String, usize, usize), ()>::new();
++    let mut covered_lines = std::collections::BTreeSet::new();
+     let mut instance_count = 0usize;
+     for g in &clone_groups {
+         instance_count += g.instances.len();
+         for inst in &g.instances {
+-            let key = (inst.path.clone(), inst.start_line, inst.end_line);
+-            if seen_spans.insert(key, ()).is_none() {
+-                duplicated_lines += inst
+-                    .end_line
+-                    .saturating_sub(inst.start_line)
+-                    .saturating_add(1);
++            for line in inst.start_line..=inst.end_line {
++                covered_lines.insert((inst.path.clone(), line));
+             }
+         }
+     }
++    let duplicated_lines = covered_lines.len();
+     let pct = if total_lines == 0 {
+         0.0
+     } else {
+diff --git a/src/flags.rs b/src/flags.rs
+index b4930b6..fb7536d 100644
+--- a/src/flags.rs
++++ b/src/flags.rs
+@@ -7,7 +7,7 @@ use full_moon::node::Node;
+ use full_moon::parse;
+ use serde::Serialize;
+ 
+-use crate::discover::discover_files;
++use crate::discover::discover_configured_files;
+ use crate::graph::display_rel;
+ 
+ #[derive(Debug, Clone, Serialize)]
+@@ -42,7 +42,7 @@ pub fn analyze_flags(root: &Path, explain: bool) -> Result<FlagsReport, String>
+     let root = root
+         .canonicalize()
+         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+-    let files = discover_files(&root);
++    let files = discover_configured_files(&root)?;
+     let mut flags = Vec::new();
+ 
+     for file in &files {
+diff --git a/src/graph.rs b/src/graph.rs
+index b4b2a3a..20fef43 100644
+--- a/src/graph.rs
++++ b/src/graph.rs
+@@ -146,8 +146,10 @@ pub fn build_require_graph(root: &Path, files: &[PathBuf]) -> Result<RequireGrap
+ }
+ 
+ pub fn display_rel(root: &Path, path: &Path) -> String {
+-    path.strip_prefix(root)
+-        .unwrap_or(path)
++    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
++    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
++    path.strip_prefix(&root)
++        .unwrap_or(&path)
+         .to_string_lossy()
+         .replace('\\', "/")
+ }
+@@ -258,7 +260,8 @@ fn unquote(raw: &str) -> String {
+                 });
+                 if let Some(start) = inner_start {
+                     if end > start {
+-                        return t[start..end].to_string();
++                        let closing_len = start;
++                        return t[start..t.len() - closing_len].to_string();
+                     }
+                 }
+             }
+diff --git a/src/inspect.rs b/src/inspect.rs
+index 23a0772..9150334 100644
+--- a/src/inspect.rs
++++ b/src/inspect.rs
+@@ -6,7 +6,7 @@ use serde::Serialize;
+ 
+ use crate::complexity::analyze_functions;
+ use crate::dead_code::{analyze_dead_code, DeadCodeOptions};
+-use crate::discover::discover_files;
++use crate::discover::discover_configured_files;
+ use crate::dupes::{analyze_dupes, DupesOptions};
+ use crate::graph::{build_require_graph, display_rel, fan_counts};
+ use crate::health::{analyze_health, FileAnalysis, HealthOptions};
+@@ -41,7 +41,7 @@ pub fn inspect_target(
+     let root = root
+         .canonicalize()
+         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+-    let files = discover_files(&root);
++    let files = discover_configured_files(&root)?;
+     let graph = build_require_graph(&root, &files)?;
+     let rel = normalize_target(&root, target, &graph.files)?;
+ 
+diff --git a/src/lib.rs b/src/lib.rs
+index f9a6aca..01a7cc1 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -32,7 +32,7 @@ pub use config::{
+     init_config, load_config, Config, InitFormat, ResolvedConfig,
+ };
+ pub use dead_code::{analyze_dead_code, DeadCodeOptions, DeadCodeReport, DeadKind};
+-pub use discover::{discover_files, is_luau_source, is_test_path};
++pub use discover::{discover_files, discover_configured_files, is_luau_source, is_test_path};
+ pub use dupes::{analyze_dupes, CloneGroup, DupesOptions, DupesReport};
+ pub use emit::{render_saved_report, ReportFormat};
+ pub use explain::{explain_rule, known_rules};
+diff --git a/src/main.rs b/src/main.rs
+index 93cecb9..b4f2703 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -3,7 +3,7 @@ use std::path::PathBuf;
+ use clap::{Parser, Subcommand, ValueEnum};
+ use fallow_luau::{
+     analyze_audit, analyze_dead_code, analyze_dupes, analyze_flags, analyze_project,
+-    build_require_graph, collect_suppressions, discover_files, explain_rule, init_config,
++    build_require_graph, collect_suppressions, discover_configured_files, explain_rule, init_config,
+     inspect_target, list_report, load_config, render_saved_report, run_mcp_stdio, schema_manifest,
+     trace_symbol, watch_loop, write_viz, AuditOptions, DeadCodeOptions, DupesOptions, HealthOptions,
+     InitFormat, ProjectOptions, ReportFormat,
+@@ -39,12 +39,12 @@ enum Command {
+         targets: bool,
+         #[arg(long, default_value_t = false)]
+         score: bool,
+-        #[arg(long, default_value_t = 20)]
+-        max_cyclomatic: u32,
+-        #[arg(long, default_value_t = 15)]
+-        max_cognitive: u32,
+-        #[arg(long, default_value_t = 60)]
+-        max_unit_size: usize,
++        #[arg(long)]
++        max_cyclomatic: Option<u32>,
++        #[arg(long)]
++        max_cognitive: Option<u32>,
++        #[arg(long)]
++        max_unit_size: Option<usize>,
+         #[arg(long, default_value_t = 180.0)]
+         since_days: f64,
+         #[arg(long)]
+@@ -60,10 +60,10 @@ enum Command {
+         entries: Vec<String>,
+     },
+     Dupes {
+-        #[arg(long, default_value_t = 30)]
+-        min_tokens: usize,
+-        #[arg(long, default_value_t = 5)]
+-        min_lines: usize,
++        #[arg(long)]
++        min_tokens: Option<usize>,
++        #[arg(long)]
++        min_lines: Option<usize>,
+     },
+     Audit {
+         #[arg(long)]
+@@ -130,7 +130,16 @@ enum ReportCliFormat {
+ 
+ fn main() {
+     let cli = Cli::parse();
+-    if let Err(err) = run(cli) {
++    // Match the project's existing .cargo/config.toml test stack. Real project
++    // ASTs also exceed the Windows executable's default main-thread stack.
++    let result = std::thread::Builder::new()
++        .name("analysis".into())
++        .stack_size(8_388_608)
++        .spawn(move || run(cli))
++        .expect("start analysis thread")
++        .join()
++        .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
++    if let Err(err) = result {
+         eprintln!("error: {err}");
+         std::process::exit(1);
+     }
+@@ -147,7 +156,7 @@ fn run(cli: Cli) -> Result<(), String> {
+         }
+         Command::List => {
+             let root = canon(&cli.root)?;
+-            let files = discover_files(&root);
++            let files = discover_configured_files(&root)?;
+             let graph = build_require_graph(&root, &files)?;
+             println!(
+                 "{}",
+@@ -175,10 +184,11 @@ fn run(cli: Cli) -> Result<(), String> {
+             format: _,
+         } => {
+             let any = complexity || file_scores || hotspots || targets || score;
++            let config = load_config(&cli.root)?.config;
+             let mut health = HealthOptions {
+-                max_cyclomatic,
+-                max_cognitive,
+-                max_unit_size,
++                max_cyclomatic: max_cyclomatic.unwrap_or(config.health.max_cyclomatic),
++                max_cognitive: max_cognitive.unwrap_or(config.health.max_cognitive),
++                max_unit_size: max_unit_size.unwrap_or(config.health.max_unit_size),
+                 explain: cli.explain,
+                 since_days,
+                 score: if any { score } else { true },
+@@ -196,23 +206,6 @@ fn run(cli: Cli) -> Result<(), String> {
+                     health.file_scores = true;
+                 }
+             }
+-            let root = canon(&cli.root)?;
+-            let files = discover_files(&root);
+-            let graph = build_require_graph(&root, &files)?;
+-            let dead = analyze_dead_code(&root, &files, &graph, &DeadCodeOptions::default())?;
+-            health.dead_ratio_override = Some(dead.dead_ratio_by_file.clone());
+-            health.dead_file_count = Some(dead.unused_files.len());
+-            health.dead_export_count = Some(dead.unused_exports.len());
+-            health.total_export_count = Some(
+-                dead.dead_ratio_by_file
+-                    .keys()
+-                    .count()
+-                    .max(dead.unused_exports.len()),
+-            );
+-            health.circular_deps = Some(dead.cycles.len());
+-            let dupes = analyze_dupes(&root, &files, &DupesOptions::default())?;
+-            health.duplication_pct = Some(dupes.stats.duplication_percentage);
+-
+             let (_project, report) =
+                 analyze_project(&cli.root, &ProjectOptions { health })?;
+             println!("{}", serde_json::to_string_pretty(&report).unwrap());
+@@ -220,7 +213,7 @@ fn run(cli: Cli) -> Result<(), String> {
+         }
+         Command::DeadCode { entries } => {
+             let root = canon(&cli.root)?;
+-            let files = discover_files(&root);
++            let files = discover_configured_files(&root)?;
+             let graph = build_require_graph(&root, &files)?;
+             let report = analyze_dead_code(
+                 &root,
+@@ -239,14 +232,15 @@ fn run(cli: Cli) -> Result<(), String> {
+             min_lines,
+         } => {
+             let root = canon(&cli.root)?;
+-            let files = discover_files(&root);
++            let files = discover_configured_files(&root)?;
++            let config = load_config(&root)?.config;
+             let report = analyze_dupes(
+                 &root,
+                 &files,
+                 &DupesOptions {
+                     explain: cli.explain,
+-                    min_tokens,
+-                    min_lines,
++                    min_tokens: min_tokens.unwrap_or(config.duplicates.min_tokens),
++                    min_lines: min_lines.unwrap_or(config.duplicates.min_lines),
+                     ..DupesOptions::default()
+                 },
+             )?;
+@@ -259,10 +253,13 @@ fn run(cli: Cli) -> Result<(), String> {
+                 &AuditOptions {
+                     explain: cli.explain,
+                     changed_since,
+-                    ..AuditOptions::default()
++                    ..AuditOptions::configured(&cli.root)?
+                 },
+             )?;
+             println!("{}", serde_json::to_string_pretty(&report).unwrap());
++            if report.verdict == fallow_luau::AuditVerdict::Fail {
++                return Err("audit failed; see JSON findings".into());
++            }
+             Ok(())
+         }
+         Command::Explain { id } => {
+diff --git a/src/mcp.rs b/src/mcp.rs
+index 2ccce5e..8f10693 100644
+--- a/src/mcp.rs
++++ b/src/mcp.rs
+@@ -8,7 +8,7 @@ use serde_json::{json, Value};
+ 
+ use crate::audit::{analyze_audit, AuditOptions};
+ use crate::dead_code::{analyze_dead_code, DeadCodeOptions};
+-use crate::discover::discover_files;
++use crate::discover::discover_configured_files;
+ use crate::dupes::{analyze_dupes, DupesOptions};
+ use crate::explain::explain_rule;
+ use crate::graph::build_require_graph;
+@@ -119,17 +119,18 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
+         "schema" => Ok(schema_manifest(true)),
+         "list_project" => {
+             let root = root.canonicalize().map_err(|e| e.to_string())?;
+-            let files = discover_files(&root);
++            let files = discover_configured_files(&root)?;
+             let graph = build_require_graph(&root, &files)?;
+             Ok(list_report(&root.display().to_string(), &graph, true))
+         }
+         "check_health" => {
++            let config = crate::config::load_config(&root)?.config;
+             let (_p, report) = analyze_project(
+                 &root,
+                 &ProjectOptions {
+                     health: HealthOptions {
+                         explain: true,
+-                        ..HealthOptions::default()
++                        ..config.health_options()
+                     },
+                 },
+             )?;
+@@ -137,7 +138,7 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
+         }
+         "find_dead_code" => {
+             let root = root.canonicalize().map_err(|e| e.to_string())?;
+-            let files = discover_files(&root);
++            let files = discover_configured_files(&root)?;
+             let graph = build_require_graph(&root, &files)?;
+             let report = analyze_dead_code(
+                 &root,
+@@ -152,13 +153,14 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
+         }
+         "find_dupes" => {
+             let root = root.canonicalize().map_err(|e| e.to_string())?;
+-            let files = discover_files(&root);
++            let files = discover_configured_files(&root)?;
++            let config = crate::config::load_config(&root)?.config;
+             let report = analyze_dupes(
+                 &root,
+                 &files,
+                 &DupesOptions {
+                     explain: true,
+-                    ..DupesOptions::default()
++                    ..config.dupes_options()
+                 },
+             )?;
+             Ok(serde_json::to_value(report).unwrap())
+@@ -173,7 +175,7 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
+                 &AuditOptions {
+                     explain: true,
+                     changed_since: changed,
+-                    ..AuditOptions::default()
++                    ..AuditOptions::configured(&root)?
+                 },
+             )?;
+             Ok(serde_json::to_value(report).unwrap())
+@@ -204,40 +206,18 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
+ }
+ 
+ fn read_message(reader: &mut impl BufRead) -> Result<Option<Value>, String> {
+-    let mut headers = String::new();
+-    loop {
+-        let mut line = String::new();
+-        let n = reader.read_line(&mut line).map_err(|e| e.to_string())?;
+-        if n == 0 {
+-            return Ok(None);
+-        }
+-        if line == "\r\n" || line == "\n" {
+-            break;
+-        }
+-        headers.push_str(&line);
+-    }
+-    let mut content_length = None;
+-    for line in headers.lines() {
+-        let lower = line.to_ascii_lowercase();
+-        if let Some(rest) = lower.strip_prefix("content-length:") {
+-            content_length = Some(
+-                rest.trim()
+-                    .parse::<usize>()
+-                    .map_err(|e| format!("bad content-length: {e}"))?,
+-            );
+-        }
++    let mut line = String::new();
++    if reader.read_line(&mut line).map_err(|e| e.to_string())? == 0 {
++        return Ok(None);
+     }
+-    let len = content_length.ok_or_else(|| "missing Content-Length".to_string())?;
+-    let mut buf = vec![0u8; len];
+-    reader.read_exact(&mut buf).map_err(|e| e.to_string())?;
+-    let v: Value = serde_json::from_slice(&buf).map_err(|e| e.to_string())?;
++    let v: Value = serde_json::from_str(&line).map_err(|e| e.to_string())?;
+     Ok(Some(v))
+ }
+ 
+ fn write_message(out: &mut impl Write, value: &Value) -> Result<(), String> {
+     let body = serde_json::to_vec(value).map_err(|e| e.to_string())?;
+-    write!(out, "Content-Length: {}\r\n\r\n", body.len()).map_err(|e| e.to_string())?;
+     out.write_all(&body).map_err(|e| e.to_string())?;
++    out.write_all(b"\n").map_err(|e| e.to_string())?;
+     out.flush().map_err(|e| e.to_string())?;
+     Ok(())
+ }
+diff --git a/src/meta.rs b/src/meta.rs
+index 28d8717..2863696 100644
+--- a/src/meta.rs
++++ b/src/meta.rs
+@@ -4,6 +4,7 @@ use serde_json::{json, Value};
+ pub fn health_meta() -> Value {
+     json!({
+         "docs": "https://docs.fallow.tools/explanations/health",
++        "limitations": "Metrics are navigation hints, not evidence of a behavior defect. Coverage is static_estimated, not measured. Unresolved imports and heuristic dead-code detection can affect scores; verify candidates in source and tests.",
+         "metrics": {
+             "cyclomatic": {
+                 "name": "Cyclomatic complexity",
+@@ -74,6 +75,7 @@ pub fn schema_meta() -> Value {
+ pub fn dead_code_meta() -> Value {
+     json!({
+         "docs": "https://docs.fallow.tools/explanations/dead-code",
++        "limitations": "Candidates only. Unresolved imports, module escapes, lexical shadowing and indirect key access are not fully modeled. Do not delete code without independently checking its consumers and tests. Entry-module exports and exported types are retained.",
+         "parity": "docs/parity.md",
+         "issue_types": {
+             "unused_file": "Unreachable from entry points (init/main + tests; fan-in=0 library roots when no init).",
+diff --git a/src/project.rs b/src/project.rs
+index 3942fb6..1149fe4 100644
+--- a/src/project.rs
++++ b/src/project.rs
+@@ -4,7 +4,7 @@ use full_moon::parse;
+ use serde::Serialize;
+ 
+ use crate::complexity::analyze_functions;
+-use crate::discover::{discover_files, is_test_path};
++use crate::discover::{discover_configured_files, is_test_path};
+ use crate::graph::{build_require_graph, display_rel, RequireGraph};
+ use crate::health::{analyze_health, FileAnalysis, HealthOptions, HealthReport};
+ 
+@@ -24,7 +24,7 @@ pub fn analyze_project(root: &Path, opts: &ProjectOptions) -> Result<(Project, H
+     let root = root
+         .canonicalize()
+         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+-    let files = discover_files(&root);
++    let files = discover_configured_files(&root)?;
+     let graph = build_require_graph(&root, &files)?;
+ 
+     let mut analyses = Vec::new();
+@@ -53,7 +53,23 @@ pub fn analyze_project(root: &Path, opts: &ProjectOptions) -> Result<(Project, H
+         });
+     }
+ 
+-    let report = analyze_health(&root, &analyses, &graph, &opts.health);
++    // Both CLI and MCP use this composition so dead-code and duplication inputs
++    // cannot silently disappear from the same health report on one surface.
++    let mut health = opts.health.clone();
++    let dead = crate::dead_code::analyze_dead_code(
++        &root, &files, &graph, &crate::dead_code::DeadCodeOptions::default(),
++    )?;
++    health.dead_ratio_override.get_or_insert(dead.dead_ratio_by_file.clone());
++    health.dead_file_count.get_or_insert(dead.unused_files.len());
++    health.dead_export_count.get_or_insert(dead.unused_exports.len());
++    health.total_export_count.get_or_insert(dead.total_exports);
++    health.circular_deps.get_or_insert(dead.cycles.len());
++    if health.score && health.duplication_pct.is_none() {
++        let config = crate::config::load_config(&root)?.config;
++        let dupes = crate::dupes::analyze_dupes(&root, &files, &config.dupes_options())?;
++        health.duplication_pct = Some(dupes.stats.duplication_percentage);
++    }
++    let report = analyze_health(&root, &analyses, &graph, &health);
+     Ok((
+         Project {
+             root,
+diff --git a/src/report.rs b/src/report.rs
+index b998661..894a5d5 100644
+--- a/src/report.rs
++++ b/src/report.rs
+@@ -48,7 +48,14 @@ pub fn schema_manifest(explain: bool) -> Value {
+             "css", "npm", "typescript-checker", "knip", "jscpd-migrate",
+             "fallow-cloud", "react-next-vite", "node-napi", "fix"
+         ],
+-        "status": "parity-complete"
++        "status": "experimental",
++        "limitations": [
++            "Command availability is not proof of full Fallow parity.",
++            "Dead-code results are candidates: lexical shadowing, module escapes, and indirect imports are not fully modeled.",
++            "Rojo, Roblox instance paths, aliases, and custom resolver plugins are not implemented.",
++            "Boundary configuration is not enforced; suppression markers are inventoried but do not suppress findings.",
++            "Trace operates on modules, not symbol call sites. Static coverage estimates are not runtime coverage."
++        ]
+     });
+     if explain {
+         v.as_object_mut()
+diff --git a/src/suppressions.rs b/src/suppressions.rs
+index 0c67927..35f354f 100644
+--- a/src/suppressions.rs
++++ b/src/suppressions.rs
+@@ -4,7 +4,7 @@ use std::path::Path;
+ 
+ use serde::Serialize;
+ 
+-use crate::discover::discover_files;
++use crate::discover::discover_configured_files;
+ use crate::graph::display_rel;
+ 
+ #[derive(Debug, Clone, Serialize)]
+@@ -37,7 +37,7 @@ pub fn collect_suppressions(root: &Path, explain: bool) -> Result<SuppressionsRe
+     let root = root
+         .canonicalize()
+         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+-    let files = discover_files(&root);
++    let files = discover_configured_files(&root)?;
+     let mut suppressions = Vec::new();
+     let mut files_with = 0usize;
+ 
+diff --git a/src/trace.rs b/src/trace.rs
+index 04cd416..8e7e9ae 100644
+--- a/src/trace.rs
++++ b/src/trace.rs
+@@ -5,7 +5,7 @@ use std::path::Path;
+ 
+ use serde::Serialize;
+ 
+-use crate::discover::discover_files;
++use crate::discover::discover_configured_files;
+ use crate::graph::{adjacency, build_require_graph, display_rel};
+ use crate::dead_code::analyze_dead_code;
+ use crate::dead_code::DeadCodeOptions;
+@@ -44,7 +44,7 @@ pub fn trace_symbol(
+     let root = root
+         .canonicalize()
+         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+-    let files = discover_files(&root);
++    let files = discover_configured_files(&root)?;
+     let graph = build_require_graph(&root, &files)?;
+     let rel = path.replace('\\', "/");
+     if !graph.files.iter().any(|f| f == &rel) {
+diff --git a/src/viz.rs b/src/viz.rs
+index d581a47..405bb3f 100644
+--- a/src/viz.rs
++++ b/src/viz.rs
+@@ -3,7 +3,7 @@
+ use std::path::Path;
+ 
+ use crate::complexity::analyze_functions;
+-use crate::discover::{discover_files, is_test_path};
++use crate::discover::{discover_configured_files, is_test_path};
+ use crate::graph::{build_require_graph, display_rel, fan_counts};
+ use crate::health::{analyze_health, FileAnalysis, HealthOptions};
+ use crate::dead_code::{analyze_dead_code, DeadCodeOptions};
+@@ -13,7 +13,7 @@ pub fn render_viz_html(root: &Path) -> Result<String, String> {
+     let root = root
+         .canonicalize()
+         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+-    let files = discover_files(&root);
++    let files = discover_configured_files(&root)?;
+     let graph = build_require_graph(&root, &files)?;
+     let dead = analyze_dead_code(
+         &root,
+diff --git a/src/watch.rs b/src/watch.rs
+index 4c1111e..7cd0bcb 100644
+--- a/src/watch.rs
++++ b/src/watch.rs
+@@ -54,7 +54,7 @@ fn run_once(root: &Path, changed_since: &Option<String>, explain: bool) -> Resul
+         &AuditOptions {
+             explain,
+             changed_since: changed_since.clone(),
+-            ..AuditOptions::default()
++            ..AuditOptions::configured(root)?
+         },
+     )?;
+     println!("{}", serde_json::to_string_pretty(&report).unwrap());
+diff --git a/tests/fixtures_rest.rs b/tests/fixtures_rest.rs
+index 1c38d78..0dbc520 100644
+--- a/tests/fixtures_rest.rs
++++ b/tests/fixtures_rest.rs
+@@ -15,9 +15,10 @@ fn fixtures(name: &str) -> PathBuf {
+ }
+ 
+ #[test]
+-fn schema_marks_parity_complete() {
++fn schema_discloses_experimental_status_and_available_commands() {
+     let s = schema_manifest(false);
+-    assert_eq!(s["status"], "parity-complete");
++    assert_eq!(s["status"], "experimental");
++    assert!(!s["limitations"].as_array().unwrap().is_empty());
+     let names: Vec<_> = s["commands"]
+         .as_array()
+         .unwrap()

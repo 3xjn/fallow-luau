@@ -1,0 +1,52 @@
+diff --git a/src/shared/game/ProfilePersistence.luau b/src/shared/game/ProfilePersistence.luau
+index ae69c6d..33f673b 100644
+--- a/src/shared/game/ProfilePersistence.luau
++++ b/src/shared/game/ProfilePersistence.luau
+@@ -175,6 +175,14 @@ end
+ -- itself (cosmetics, entitlements, settings) can yield, so that happens
+ -- before the transform and only this reconcile runs inside it.
+ function ProfilePersistence.reconcileWithStored(payload, existingProfile)
++	-- A newer server may have updated this profile after our session loaded it.
++	-- Both UpdateAsync callers catch errors; aborting here protects the newer
++	-- schema and keeps the receipt unfulfilled for a later retry.
++	local storedVersion = ProfilePersistence.profileVersion(existingProfile)
++	if storedVersion and storedVersion > ProfilePersistence.Version then
++		error("Cannot reconcile a profile written by a newer schema version", 2)
++	end
++
+ 	local reconciled = table.clone(payload)
+ 
+ 	if typeof(existingProfile) ~= "table" then
+diff --git a/src/shared/game/UIControlRules.luau b/src/shared/game/UIControlRules.luau
+index c935c87..04a1d00 100644
+--- a/src/shared/game/UIControlRules.luau
++++ b/src/shared/game/UIControlRules.luau
+@@ -216,8 +216,16 @@ function UIControlRules.consumeActionCooldown(timestamps, key, cooldownSeconds,
+ 	end
+ 
+ 	now = if typeof(now) == "number" then now else os.clock()
++	if now ~= now then
++		return false
++	end
++
++	if timestamps[key] == nil then
++		timestamps[key] = now
++		return true
++	end
+ 
+-	if not UIControlRules.canFireServerAction(timestamps[key] or 0, now, cooldownSeconds) then
++	if not UIControlRules.canFireServerAction(timestamps[key], now, cooldownSeconds) then
+ 		return false
+ 	end
+ 
+@@ -255,6 +263,10 @@ function UIControlRules.validateBoardGridChildren(children)
+ 		elseif
+ 			typeof(x) ~= "number"
+ 			or typeof(y) ~= "number"
++			or x ~= x
++			or y ~= y
++			or x % 1 ~= 0
++			or y % 1 ~= 0
+ 			or x < 1
+ 			or x > Config.BoardSize
+ 			or y < 1

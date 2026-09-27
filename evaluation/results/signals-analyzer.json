@@ -1,0 +1,436 @@
+{
+  "schema_version": 1,
+  "root": "\\\\?\\C:\\Users\\asher\\Documents\\ChatGPT\\fallow-luau\\target\\evaluation\\upstream\\signals",
+  "files_analyzed": 36,
+  "findings": [],
+  "file_scores": [
+    {
+      "path": "modules/signals/src/Signals.lua",
+      "maintainability_index": 73.96,
+      "complexity_density": 0.2013,
+      "dead_code_ratio": 1.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 303,
+      "function_count": 30,
+      "total_cyclomatic": 61,
+      "total_cognitive": 50,
+      "crap_max": 42.0,
+      "crap_above_threshold": 2
+    },
+    {
+      "path": "modules/signals-experimental/src/createProxy.lua",
+      "maintainability_index": 93.47,
+      "complexity_density": 0.2176,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 170,
+      "function_count": 18,
+      "total_cyclomatic": 37,
+      "total_cognitive": 32,
+      "crap_max": 30.0,
+      "crap_above_threshold": 2
+    },
+    {
+      "path": "modules/signals-scheduler/src/SignalsScheduler.lua",
+      "maintainability_index": 74.0,
+      "complexity_density": 0.2,
+      "dead_code_ratio": 1.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 70,
+      "function_count": 6,
+      "total_cyclomatic": 14,
+      "total_cognitive": 16,
+      "crap_max": 30.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "modules/signals-implicit-scope/src/SignalsImplicitScope.lua",
+      "maintainability_index": 75.07,
+      "complexity_density": 0.1642,
+      "dead_code_ratio": 1.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 67,
+      "function_count": 9,
+      "total_cyclomatic": 11,
+      "total_cognitive": 2,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "scripts/processExecution.luau",
+      "maintainability_index": 76.84,
+      "complexity_density": 0.1053,
+      "dead_code_ratio": 1.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 19,
+      "function_count": 1,
+      "total_cyclomatic": 2,
+      "total_cognitive": 1,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/resources/src/createResource.lua",
+      "maintainability_index": 93.9,
+      "complexity_density": 0.2034,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 59,
+      "function_count": 6,
+      "total_cyclomatic": 12,
+      "total_cognitive": 8,
+      "crap_max": 20.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals/src/callUserSpace.lua",
+      "maintainability_index": 93.79,
+      "complexity_density": 0.2069,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 29,
+      "function_count": 3,
+      "total_cyclomatic": 6,
+      "total_cognitive": 5,
+      "crap_max": 20.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/resources/src/createCachedResource.lua",
+      "maintainability_index": 93.79,
+      "complexity_density": 0.2069,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 58,
+      "function_count": 7,
+      "total_cyclomatic": 12,
+      "total_cognitive": 6,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals-experimental/src/createReducer.lua",
+      "maintainability_index": 94.23,
+      "complexity_density": 0.1923,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 26,
+      "function_count": 3,
+      "total_cyclomatic": 5,
+      "total_cognitive": 3,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals/src/__tests__/Signals.test.lua",
+      "maintainability_index": 96.9,
+      "complexity_density": 0.1032,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 872,
+      "function_count": 80,
+      "total_cyclomatic": 90,
+      "total_cognitive": 15,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/resources/src/__tests__/createResource.test.lua",
+      "maintainability_index": 92.84,
+      "complexity_density": 0.2387,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 155,
+      "function_count": 37,
+      "total_cyclomatic": 37,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals-flags/src/init.lua",
+      "maintainability_index": 93.33,
+      "complexity_density": 0.2222,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 9,
+      "function_count": 2,
+      "total_cyclomatic": 2,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals-experimental/src/__tests__/createProxy.test.lua",
+      "maintainability_index": 98.21,
+      "complexity_density": 0.0597,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 268,
+      "function_count": 15,
+      "total_cyclomatic": 16,
+      "total_cognitive": 1,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals-experimental/src/__tests__/createReducer.test.lua",
+      "maintainability_index": 97.5,
+      "complexity_density": 0.0833,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 36,
+      "function_count": 2,
+      "total_cyclomatic": 3,
+      "total_cognitive": 1,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals-experimental/src/onDisposed.lua",
+      "maintainability_index": 95.0,
+      "complexity_density": 0.1667,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 18,
+      "function_count": 2,
+      "total_cyclomatic": 3,
+      "total_cognitive": 1,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/resources/src/__tests__/createCachedResource.test.lua",
+      "maintainability_index": 96.32,
+      "complexity_density": 0.1225,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 302,
+      "function_count": 37,
+      "total_cyclomatic": 37,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals-scheduler/src/__tests__/SignalsScheduler.test.lua",
+      "maintainability_index": 96.39,
+      "complexity_density": 0.1204,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 274,
+      "function_count": 33,
+      "total_cyclomatic": 33,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": ".lute/analyze.luau",
+      "maintainability_index": 97.5,
+      "complexity_density": 0.0833,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 12,
+      "function_count": 1,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals-experimental/src/__tests__/onDisposed.test.lua",
+      "maintainability_index": 97.51,
+      "complexity_density": 0.0828,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 169,
+      "function_count": 14,
+      "total_cyclomatic": 14,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "modules/signals-implicit-scope/src/__tests__/SignalsImplicitScope.test.lua",
+      "maintainability_index": 98.19,
+      "complexity_density": 0.0603,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 116,
+      "function_count": 7,
+      "total_cyclomatic": 7,
+      "total_cognitive": 0,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    }
+  ],
+  "large_functions": [
+    {
+      "path": "modules/resources/src/__tests__/createCachedResource.test.lua",
+      "name": "<anonymous>",
+      "line": 12,
+      "lines": 291
+    },
+    {
+      "path": "modules/resources/src/__tests__/createResource.test.lua",
+      "name": "<anonymous>",
+      "line": 11,
+      "lines": 145
+    },
+    {
+      "path": "modules/signals-experimental/src/createProxy.lua",
+      "name": "createProxy",
+      "line": 28,
+      "lines": 141
+    },
+    {
+      "path": "modules/signals/src/__tests__/Signals.test.lua",
+      "name": "<anonymous>",
+      "line": 137,
+      "lines": 122
+    },
+    {
+      "path": "modules/signals/src/Signals.lua",
+      "name": "createComputed",
+      "line": 138,
+      "lines": 101
+    },
+    {
+      "path": "modules/signals/src/__tests__/Signals.test.lua",
+      "name": "<anonymous>",
+      "line": 260,
+      "lines": 90
+    },
+    {
+      "path": "modules/signals/src/__tests__/Signals.test.lua",
+      "name": "<anonymous>",
+      "line": 428,
+      "lines": 77
+    },
+    {
+      "path": "modules/signals/src/__tests__/Signals.test.lua",
+      "name": "<anonymous>",
+      "line": 351,
+      "lines": 76
+    },
+    {
+      "path": "modules/signals-experimental/src/__tests__/createProxy.test.lua",
+      "name": "<anonymous>",
+      "line": 75,
+      "lines": 64
+    },
+    {
+      "path": "modules/signals/src/Signals.lua",
+      "name": "createSignal",
+      "line": 73,
+      "lines": 64
+    },
+    {
+      "path": "modules/signals-experimental/src/__tests__/onDisposed.test.lua",
+      "name": "<anonymous>",
+      "line": 107,
+      "lines": 63
+    },
+    {
+      "path": "modules/signals/src/__tests__/Signals.test.lua",
+      "name": "<anonymous>",
+      "line": 75,
+      "lines": 61
+    }
+  ],
+  "vital_signs": {
+    "unit_size_profile": {
+      "low_risk": 78.59424920127796,
+      "medium_risk": 8.30670926517572,
+      "high_risk": 9.26517571884984,
+      "very_high_risk": 3.8338658146964857
+    },
+    "unit_interfacing_profile": {
+      "low_risk": 98.08306709265176,
+      "medium_risk": 1.9169329073482428,
+      "high_risk": 0.0,
+      "very_high_risk": 0.0
+    }
+  },
+  "_meta": {
+    "docs": "https://docs.fallow.tools/explanations/health",
+    "limitations": "Metrics are navigation hints, not evidence of a behavior defect. Coverage is static_estimated, not measured. Unresolved imports and heuristic dead-code detection can affect scores; verify candidates in source and tests.",
+    "metrics": {
+      "cognitive": {
+        "description": "Comprehension cost with nesting penalties (SonarSource model adapted to Luau).",
+        "interpretation": "0–7 easy; 8–15 moderate; 15+ hard. Default threshold 15.",
+        "name": "Cognitive complexity",
+        "range": "[0, ∞)"
+      },
+      "complexity_density": {
+        "description": "Total cyclomatic complexity / lines of code for the file.",
+        "interpretation": "<0.3 low; 0.3–1.0 moderate; >1.0 very dense.",
+        "name": "Complexity density",
+        "range": "[0, ∞)"
+      },
+      "crap": {
+        "description": "CC² × (1 − cov/100)³ + CC. Default coverage from test require graph (85% direct / 40% transitive / 0%).",
+        "interpretation": "<30 acceptable; 30–99 moderate; 100+ high.",
+        "name": "CRAP",
+        "range": "[0, ∞)"
+      },
+      "cyclomatic": {
+        "description": "1 + decision points (if/elseif, loops, and/or, Luau if-expressions). Every function is a unit, including nested local function.",
+        "interpretation": "1–10 simple; 11–20 moderate; 21–50 high; 50+ very high. Default threshold 20.",
+        "name": "Cyclomatic complexity",
+        "range": "[1, ∞)"
+      },
+      "hotspot_score": {
+        "description": "normalized_churn × normalized_density × 100. Churn uses 90-day half-life on commits.",
+        "interpretation": "higher = more risky; project-relative.",
+        "name": "Hotspot score",
+        "range": "[0, 100]"
+      },
+      "maintainability_index": {
+        "description": "100 - (density×30) - (dead_ratio×20) - min(ln(fan_out+1)×4, 15), clamped to [0,100].",
+        "interpretation": "higher is better; <40 poor, 40–70 moderate, >70 good",
+        "name": "Maintainability Index",
+        "range": "[0, 100]"
+      },
+      "target_priority": {
+        "description": "min(density,1)×30 + hotspot_boost×25 + dead_ratio×20 + min(fan_in/20,1)×15 + min(fan_out/30,1)×10",
+        "interpretation": "higher priority first.",
+        "name": "Refactoring target priority",
+        "range": "[0, 100]"
+      },
+      "unit_interfacing": {
+        "description": "Parameter-count bins: 0–2 low, 3–4 medium, 5–6 high, 7+ very high.",
+        "interpretation": "Prefer few parameters per function.",
+        "name": "SIG unit interfacing",
+        "range": "parameter bins"
+      },
+      "unit_size": {
+        "description": "Function length in lines. Bins: 1–15 low, 16–30 medium, 31–60 high, >60 very high.",
+        "interpretation": "Flag functions over 60 lines by default.",
+        "name": "SIG unit size",
+        "range": "LOC bins"
+      }
+    }
+  }
+}

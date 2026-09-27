@@ -1,0 +1,82 @@
+diff --git a/src/Server/EventQueue.luau b/src/Server/EventQueue.luau
+index d2b2e98..eea1bfc 100644
+--- a/src/Server/EventQueue.luau
++++ b/src/Server/EventQueue.luau
+@@ -71,9 +71,16 @@ function EventQueue:_takeBatch(): { any }
+     return batch
+ end
+ 
+-function EventQueue:_removeFront(count: number)
+-    for _ = 1, count do
+-        table.remove(self._events, 1)
++-- The queue may change while sendBatch yields. Remove only events from the
++-- acknowledged batch that are still present, leaving newer events untouched.
++function EventQueue:_removeBatch(batch: { any })
++    for _, sent in batch do
++        for index, queued in self._events do
++            if queued == sent then
++                table.remove(self._events, index)
++                break
++            end
++        end
+     end
+ end
+ 
+@@ -101,21 +108,26 @@ function EventQueue:flush()
+             local action = self._retryPolicy.classify(result.statusCode)
+ 
+             if action == "success" then
+-                self:_removeFront(#batch)
++                self:_removeBatch(batch)
+                 self._retryCount = 0
+                 self._pausedUntil = 0
+             elseif action == "drop" then
+                 self._logger:warn(
+                     `dropping {#batch} events (non-retryable status {result.statusCode})`
+                 )
+-                self:_removeFront(#batch)
++                self:_removeBatch(batch)
+             elseif action == "retry_smaller" then
+-                self._adjustedBatchSize = math.max(1, math.floor(self._adjustedBatchSize / 2))
+-                self._logger:warn(
+-                    `payload too large, reducing batch size to {self._adjustedBatchSize}`
+-                )
+-                self:_backoff()
+-                return
++                if #batch == 1 then
++                    self._logger:warn("dropping event after 413; single-event batch cannot shrink")
++                    self:_removeBatch(batch)
++                else
++                    self._adjustedBatchSize = math.max(1, math.floor(self._adjustedBatchSize / 2))
++                    self._logger:warn(
++                        `payload too large, reducing batch size to {self._adjustedBatchSize}`
++                    )
++                    self:_backoff()
++                    return
++                end
+             else -- "retry"
+                 self:_backoff()
+                 return
+diff --git a/src/Server/FlagCache.luau b/src/Server/FlagCache.luau
+index b855be6..eed8acc 100644
+--- a/src/Server/FlagCache.luau
++++ b/src/Server/FlagCache.luau
+@@ -44,14 +44,15 @@ function FlagCache.applyResponse(store, response)
+         return
+     end
+ 
++    -- A successful response is a complete snapshot, not a delta.
++    table.clear(store.values)
++    table.clear(store.payloads)
++    table.clear(store.details)
+     store.requestId = response.requestId
+     store.evaluatedAt = response.evaluatedAt
+ 
+     -- Quota limited: clear everything, keep request metadata.
+     if isNonEmptyArray(response.quotaLimited) then
+-        table.clear(store.values)
+-        table.clear(store.payloads)
+-        table.clear(store.details)
+         return
+     end
+ 

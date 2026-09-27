@@ -1,0 +1,133 @@
+diff --git a/tests/effect.spec.luau b/tests/effect.spec.luau
+index 9d55560..6f9837f 100644
+--- a/tests/effect.spec.luau
++++ b/tests/effect.spec.luau
+@@ -282,6 +282,64 @@ local function shouldHandleFlagsAreIndirectlyUpdatedDuringCheckDirty()
+ 	assert(triggers == 2, getFunctionName())
+ end
+ 
++local function shouldDisposeEffectWhenInitialRunFails()
++	local getA, setA = signal(0)
++	local runs = 0
++	local ok = pcall(function()
++		effect(function()
++			getA()
++			runs += 1
++			error("initial failure")
++		end)
++	end)
++	assert(not ok, getFunctionName())
++	setA(1)
++	assert(runs == 1, getFunctionName())
++end
++
++local function shouldNotLinkFailedInnerEffectToParent()
++	local getOuter, setOuter = signal(0)
++	local getInner, setInner = signal(0)
++	local outerRuns = 0
++	local innerRuns = 0
++	local stop = effect(function()
++		getOuter()
++		outerRuns += 1
++		pcall(function()
++			effect(function()
++				getInner()
++				innerRuns += 1
++				error("inner failure")
++			end)
++		end)
++	end)
++	setInner(1)
++	assert(outerRuns == 1 and innerRuns == 1, getFunctionName())
++	setOuter(1)
++	assert(outerRuns == 2 and innerRuns == 2, getFunctionName())
++	stop()
++end
++
++local function shouldPreserveEffectErrors()
++	local getA, setA = signal(0)
++	local ok, err = pcall(function()
++		effect(function()
++			error("initial sentinel")
++		end)
++	end)
++	assert(not ok and string.find(tostring(err), "initial sentinel", 1, true), getFunctionName())
++
++	effect(function()
++		if getA() == 1 then
++			error("rerun sentinel")
++		end
++	end)
++	ok, err = pcall(function()
++		setA(1)
++	end)
++	assert(not ok and string.find(tostring(err), "rerun sentinel", 1, true), getFunctionName())
++end
++
+ shouldClearSubscriptionsWhenUntrackedByAllSubscribers()
+ shouldNotRunUntrackedInnerEffect()
+ shouldRunOuterEffectFirst()
+@@ -292,5 +350,8 @@ shouldCustomEffectSupportBatch()
+ shouldDuplicateSubscribersDoNotAffectTheNotifyOrder()
+ shouldHandleSideEffectWithInnerEffects()
+ shouldHandleFlagsAreIndirectlyUpdatedDuringCheckDirty()
++shouldDisposeEffectWhenInitialRunFails()
++shouldNotLinkFailedInnerEffectToParent()
++shouldPreserveEffectErrors()
+ 
+ return {}
+diff --git a/tests/effectScope.spec.luau b/tests/effectScope.spec.luau
+index a748cda..cbcfd82 100644
+--- a/tests/effectScope.spec.luau
++++ b/tests/effectScope.spec.luau
+@@ -34,4 +34,23 @@ end
+ 
+ shouldNotTriggerAfterStop()
+ 
++local function shouldDisposeScopeChildrenWhenCreationFails()
++	local getCount, setCount = signal(0)
++	local runs = 0
++	local ok, err = pcall(function()
++		effectScope(function()
++			effect(function()
++				getCount()
++				runs += 1
++			end)
++			error("scope sentinel")
++		end)
++	end)
++	assert(not ok and string.find(tostring(err), "scope sentinel", 1, true), getFunctionName())
++	setCount(1)
++	assert(runs == 1, getFunctionName())
++end
++
++shouldDisposeScopeChildrenWhenCreationFails()
++
+ return {}
+diff --git a/tests/untrack.spec.luau b/tests/untrack.spec.luau
+index 7e11b5c..0c8538b 100644
+--- a/tests/untrack.spec.luau
++++ b/tests/untrack.spec.luau
+@@ -28,4 +28,22 @@ end
+ 
+ shouldPauseTracking()
+ 
++local function shouldRestoreTrackingAfterNestedPauses()
++	local src, setSrc = signal(0)
++	local runs = 0
++	local stop = signals.effect(function()
++		pauseTracking()
++		pauseTracking()
++		resumeTracking()
++		resumeTracking()
++		src()
++		runs += 1
++	end)
++	setSrc(1)
++	assert(runs == 2, getFunctionName())
++	stop()
++end
++
++shouldRestoreTrackingAfterNestedPauses()
++
+ return {}

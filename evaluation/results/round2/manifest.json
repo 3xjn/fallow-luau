@@ -1,0 +1,34 @@
+{
+  "round": 2,
+  "model": "gpt-6-sol",
+  "reasoning": "medium",
+  "analyzer_sha256": "BB46499D838D649E53648AEA9B67B7EB9A6394605DFA23E9582228ED01FB5F84",
+  "runtime": "Lune 0.10.4",
+  "protocol": "evaluation/round2.md",
+  "outcome": "PostHog assisted 4 vs control 3; Alien assisted 2 vs control 3; aggregate 6 vs 6. No refactor-only proposals validated.",
+  "projects": [
+    {
+      "pin": "4f722e896baeb92ce2ed0b369963dbc512115922",
+      "name": "posthog-roblox"
+    },
+    {
+      "pin": "db7a368803c74cf54497b6fdaea03e4debf956bf",
+      "name": "alien-signals"
+    }
+  ],
+  "resolver_evidence": {
+    "lune_fixture_exit": 0,
+    "after_unresolved": 0,
+    "rust_tests_passed": 38,
+    "before_unresolved": 2
+  },
+  "timing_note": "No cost or speed claim; primary outcome is verified review yield.",
+  "validated_repairs": {
+    "assisted": 6,
+    "control": 6
+  },
+  "policy_dependent_withheld": {
+    "assisted": 1,
+    "control": 1
+  }
+}

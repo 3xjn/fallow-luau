@@ -67,6 +67,7 @@ impl Default for DupesOptions {
 struct Tok {
     text: String,
     line: usize,
+    end_line: usize,
     file_idx: usize,
 }
 
@@ -75,7 +76,13 @@ pub fn analyze_dupes(
     files: &[PathBuf],
     opts: &DupesOptions,
 ) -> Result<DupesReport, String> {
+    if opts.min_tokens == 0 || opts.min_lines == 0 || opts.min_occurrences < 2 {
+        return Err(
+            "duplicates require positive token/line minima and at least two occurrences".into(),
+        );
+    }
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let markers = crate::suppressions::load_markers(&root, files)?;
     let mut corpus: Vec<Tok> = Vec::new();
     let mut file_lines: Vec<usize> = Vec::new();
     let mut rels = Vec::new();
@@ -87,24 +94,26 @@ pub fn analyze_dupes(
         let lines = source.lines().count();
         file_lines.push(lines);
         rels.push(rel);
-        for tok in tokenize(&source) {
+        for tok in tokenize(&source)? {
             corpus.push(Tok {
                 text: tok.0,
                 line: tok.1,
+                end_line: tok.2,
                 file_idx: fi,
             });
         }
         // Sentinel to stop cross-file matches spanning the boundary without a gap.
         corpus.push(Tok {
-            text: format!("__EOF_{fi}__"),
+            text: format!("\0EOF:{fi}"),
             line: lines.max(1),
+            end_line: lines.max(1),
             file_idx: fi,
         });
     }
 
     let n = corpus.len();
     let total_lines: usize = file_lines.iter().sum();
-    if n < opts.min_tokens * 2 {
+    if n / 2 < opts.min_tokens {
         return Ok(empty_report(&root, opts, total_lines));
     }
 
@@ -142,16 +151,17 @@ pub fn analyze_dupes(
             let b_start = corpus[b].line;
             if a_end >= b_start && corpus[b + lcp - 1].line >= corpus[a].line {
                 // overlap — skip unless well separated
-                if (corpus[a].line as isize - corpus[b].line as isize).unsigned_abs() < opts.min_lines
+                if (corpus[a].line as isize - corpus[b].line as isize).unsigned_abs()
+                    < opts.min_lines
                 {
                     continue;
                 }
             }
         }
         let line_a0 = corpus[a].line;
-        let line_a1 = corpus[a + lcp - 1].line;
+        let line_a1 = corpus[a + lcp - 1].end_line;
         let line_b0 = corpus[b].line;
-        let line_b1 = corpus[b + lcp - 1].line;
+        let line_b1 = corpus[b + lcp - 1].end_line;
         let lines_a = line_a1.saturating_sub(line_a0).saturating_add(1);
         let lines_b = line_b1.saturating_sub(line_b0).saturating_add(1);
         if lines_a < opts.min_lines || lines_b < opts.min_lines {
@@ -189,6 +199,14 @@ pub fn analyze_dupes(
 
     let mut clone_groups: Vec<CloneGroup> = groups
         .into_values()
+        .map(|mut group| {
+            group.instances.retain(|i| {
+                !(i.start_line..=i.end_line).any(|line| {
+                    crate::suppressions::suppresses(&markers, &i.path, line, "duplicates")
+                })
+            });
+            group
+        })
         .filter(|g| g.instances.len() >= opts.min_occurrences)
         .collect();
     clone_groups.sort_by(|a, b| {
@@ -197,21 +215,17 @@ pub fn analyze_dupes(
             .then_with(|| a.fingerprint.cmp(&b.fingerprint))
     });
 
-    let mut duplicated_lines = 0usize;
-    let mut seen_spans = BTreeMap::<(String, usize, usize), ()>::new();
+    let mut covered_lines = std::collections::BTreeSet::new();
     let mut instance_count = 0usize;
     for g in &clone_groups {
         instance_count += g.instances.len();
         for inst in &g.instances {
-            let key = (inst.path.clone(), inst.start_line, inst.end_line);
-            if seen_spans.insert(key, ()).is_none() {
-                duplicated_lines += inst
-                    .end_line
-                    .saturating_sub(inst.start_line)
-                    .saturating_add(1);
+            for line in inst.start_line..=inst.end_line {
+                covered_lines.insert((inst.path.clone(), line));
             }
         }
     }
+    let duplicated_lines = covered_lines.len();
     let pct = if total_lines == 0 {
         0.0
     } else {
@@ -237,6 +251,29 @@ pub fn analyze_dupes(
         },
     }
     .with_group_count())
+}
+
+impl DupesReport {
+    pub(crate) fn retain_groups(&mut self, keep: impl Fn(&CloneGroup) -> bool) {
+        self.clone_groups.retain(keep);
+        let mut lines = std::collections::BTreeSet::new();
+        self.stats.clone_instances = 0;
+        for group in &self.clone_groups {
+            self.stats.clone_instances += group.instances.len();
+            for inst in &group.instances {
+                lines.extend(
+                    (inst.start_line..=inst.end_line).map(|line| (inst.path.clone(), line)),
+                );
+            }
+        }
+        self.stats.clone_groups = self.clone_groups.len();
+        self.stats.duplicated_lines = lines.len();
+        self.stats.duplication_percentage = if self.stats.total_lines == 0 {
+            0.0
+        } else {
+            (lines.len() as f64 * 10000.0 / self.stats.total_lines as f64).round() / 100.0
+        };
+    }
 }
 
 trait WithGroupCount {
@@ -285,14 +322,10 @@ fn longest_common_prefix(corpus: &[Tok], a: usize, b: usize, min: usize) -> usiz
         if corpus[a + i].text != corpus[b + i].text {
             break;
         }
-        if corpus[a + i].text.starts_with("__EOF_") {
+        if corpus[a + i].text.starts_with("\0EOF:") {
             break;
         }
         i += 1;
-        // Soft cap to keep groups meaningful
-        if i > 10_000 {
-            break;
-        }
     }
     if i < min {
         0
@@ -304,87 +337,30 @@ fn longest_common_prefix(corpus: &[Tok], a: usize, b: usize, min: usize) -> usiz
 fn span_has_sentinel(corpus: &[Tok], start: usize, len: usize) -> bool {
     corpus[start..start + len]
         .iter()
-        .any(|t| t.text.starts_with("__EOF_"))
+        .any(|t| t.text.starts_with("\0EOF:"))
 }
 
-fn tokenize(source: &str) -> Vec<(String, usize)> {
-    let mut out = Vec::new();
-    for (li, line) in source.lines().enumerate() {
-        let line_no = li + 1;
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("--") {
-            continue;
-        }
-        let mut chars = line.chars().peekable();
-        while let Some(&c) = chars.peek() {
-            if c.is_whitespace() {
-                chars.next();
-                continue;
-            }
-            if c == '-' && chars.clone().nth(1) == Some('-') {
-                break; // rest of line comment
-            }
-            if c == '"' || c == '\'' {
-                let quote = c;
-                let mut s = String::from(c);
-                chars.next();
-                while let Some(ch) = chars.next() {
-                    s.push(ch);
-                    if ch == quote {
-                        break;
-                    }
-                    if ch == '\\' {
-                        if let Some(n) = chars.next() {
-                            s.push(n);
-                        }
-                    }
-                }
-                out.push(("STR".into(), line_no));
-                continue;
-            }
-            if c.is_ascii_alphabetic() || c == '_' {
-                let mut id = String::new();
-                while let Some(&ch) = chars.peek() {
-                    if ch.is_ascii_alphanumeric() || ch == '_' {
-                        id.push(ch);
-                        chars.next();
-                    } else {
-                        break;
-                    }
-                }
-                out.push((id, line_no));
-                continue;
-            }
-            if c.is_ascii_digit() {
-                while let Some(&ch) = chars.peek() {
-                    if ch.is_ascii_digit() || ch == '.' || ch == 'x' || ch == 'X' {
-                        chars.next();
-                    } else {
-                        break;
-                    }
-                }
-                out.push(("NUM".into(), line_no));
-                continue;
-            }
-            // operators / punctuation as single or digraphs
-            let mut op = String::from(c);
-            chars.next();
-            if let Some(&n) = chars.peek() {
-                let digraph = format!("{c}{n}");
-                if matches!(
-                    digraph.as_str(),
-                    "==" | "~=" | "<=" | ">=" | ".." | "+=" | "-=" | "*=" | "/=" | "//" | "->"
-                ) {
-                    op = digraph;
-                    chars.next();
-                }
-            }
-            out.push((op, line_no));
-        }
-    }
-    out
+fn tokenize(source: &str) -> Result<Vec<(String, usize, usize)>, String> {
+    use full_moon::{node::Node, tokenizer::TokenType};
+    let ast = full_moon::parse(source).map_err(|e| format!("parse duplicate corpus: {e:?}"))?;
+    Ok(ast
+        .nodes()
+        .tokens()
+        .map(|reference| {
+            let token = reference.token();
+            let text = match token.token_type() {
+                TokenType::StringLiteral { .. } => "\0STRING".into(),
+                TokenType::Number { .. } => "\0NUMBER".into(),
+                _ => token.to_string(),
+            };
+            (
+                text,
+                token.start_position().line(),
+                token.end_position().line(),
+            )
+        })
+        .collect())
 }
-
 fn fnv1a(s: &str) -> u32 {
     let mut h: u32 = 0x811c9dc5;
     for b in s.bytes() {

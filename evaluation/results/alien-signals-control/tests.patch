@@ -1,0 +1,35 @@
+diff --git a/tests/effect.spec.luau b/tests/effect.spec.luau
+index 9d55560..fab4d0f 100644
+--- a/tests/effect.spec.luau
++++ b/tests/effect.spec.luau
+@@ -282,6 +282,23 @@ local function shouldHandleFlagsAreIndirectlyUpdatedDuringCheckDirty()
+ 	assert(triggers == 2, getFunctionName())
+ end
+ 
++local function shouldUnsubscribeEffectWhenInitialRunFails()
++	local getValue, setValue = signal(0)
++	local runs = 0
++	local success, err = pcall(function()
++		effect(function()
++			getValue()
++			runs += 1
++			error("initial effect failed")
++		end)
++	end)
++	assert(not success, getFunctionName())
++	assert(string.find(tostring(err), "initial effect failed", 1, true), getFunctionName())
++
++	setValue(1)
++	assert(runs == 1, getFunctionName())
++end
++
+ shouldClearSubscriptionsWhenUntrackedByAllSubscribers()
+ shouldNotRunUntrackedInnerEffect()
+ shouldRunOuterEffectFirst()
+@@ -292,5 +309,6 @@ shouldCustomEffectSupportBatch()
+ shouldDuplicateSubscribersDoNotAffectTheNotifyOrder()
+ shouldHandleSideEffectWithInnerEffects()
+ shouldHandleFlagsAreIndirectlyUpdatedDuringCheckDirty()
++shouldUnsubscribeEffectWhenInitialRunFails()
+ 
+ return {}

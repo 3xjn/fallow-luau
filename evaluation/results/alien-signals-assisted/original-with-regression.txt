@@ -1,0 +1,19 @@
+C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\replay\alien-signals-assisted\tests\untrack.spec:46: shouldKeepTrackingPausedUntilEveryNestedPauseIsResumed
+[Stack Begin]
+    Script '[C]' - function 'assert'
+    Script 'C'
+    Script 'C'
+[Stack End]
+
+C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\replay\alien-signals-assisted\tests\untrack.spec:46: shouldKeepTrackingPausedUntilEveryNestedPauseIsResumed
+stack traceback:
+	[C]: in function 'assert'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\replay\alien-signals-assisted\tests\untrack.spec:46: in function 'shouldKeepTrackingPausedUntilEveryNestedPauseIsResumed'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\replay\alien-signals-assisted\tests\untrack.spec:49: in ?
+[Stack Begin]
+    Script '[C]'
+    Script '__mlua_async_poll', Line 27
+    Script '__mlua_require', Line 22
+    Script 'C'
+[Stack End]
+

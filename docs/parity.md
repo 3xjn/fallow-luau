@@ -1,91 +1,82 @@
-# Fallow → fallow-luau 1:1 map
+# Fallow → fallow-luau capability map
 
-Algorithms follow [Fallow docs](https://docs.fallow.tools/explanations/health). We port formulas and jobs, not Fallow source. Binary/crate name: `fallow-luau`.
+Reviewed against Fallow's published documentation on **2026-09-27**. We port formulas and useful workflows, not Fallow source. This is an experimental Luau adaptation, **not full behavioral parity**. `schema` labels commands `available`; that is not a parity claim.
 
-Status: **done** | **partial** | **todo** | **skip** (SPEC).
+## Verified changes in this update
 
-## CLI commands
+| Capability | Luau behavior and proof |
+|---|---|
+| Function analysis | Nested functions, returned anonymous functions and branches in returns are visited. `regressions.rs` and `fixtures_health.rs`. Cognitive scoring remains an adaptation. |
+| Maintainability and prioritization | Short-file dampening, project percentile normalization, effort-based ordering and the test-coverage target follow [health formulas](https://fallow.tools/docs/explanations/health/). Formula and ordering fixtures in `parity_behavior.rs`. |
+| Risk evidence | CRAP findings at the configured threshold; explicit `static_estimated` model; target functions, export names, real cycle walks, importing files and clone siblings. Coverage is estimated per file. |
+| Configured scope | Entry and ignore globs plus health/clone thresholds flow through CLI/MCP; explicit CLI health flags override config. `regressions.rs`. |
+| Suppressions | Parser-recognized line comments suppress dead-code, health, clone and flag findings. Multiple kinds and reasons are accepted; strings containing markers are ignored. Raw function metrics remain visible. `parity_behavior.rs`. |
+| Architecture zones | Resolved imports crossing disallowed zones produce `boundary_violation`; malformed globs and unknown/duplicate zone names fail. Same-zone imports are permitted; unzoned files are not rejected. `parity_behavior.rs`. |
+| Changed-file audits | Analyze the full graph and clone corpus before scoping findings. Include untracked sources and clones shared with unchanged files. Scores remain full-project context. `parity_behavior.rs`. |
+| New-only audit gate | Compare structural issue keys against the explicit Git ref, preserving inherited findings and exposing attribution. Comment-induced line movement does not introduce old findings. `--gate all` gates all scoped findings. Baseline extraction does not change the checkout or register worktrees. `parity_behavior.rs`. |
+| Baseline errors | Missing, malformed, unsupported or unwritable health baselines return errors; save/load round trip excludes known targets. `parity_behavior.rs`. |
+| Imported-key references | Dot, method, literal bracket and direct-require accesses, with local/parameter shadowing. Whole-module escapes retain exports conservatively. `trace --key` includes exact observed source lines for direct references. `parity_behavior.rs`. |
+| Inspection | Method spelling and exported constants accepted; unknown symbols and ignored files return errors rather than unrelated evidence or recursion. `parity_behavior.rs`. |
+| Clones | Parser tokens ignore long comments and normalize string/number literals. Covered lines use a union. Suppressed instances are excluded. `parity_behavior.rs` and `regressions.rs`. |
+| CLI/MCP | Shared health composition and newline JSON-RPC transport; equality regression. Audit emits its report and exits nonzero for `fail`. `regressions.rs`. |
 
-| Fallow | fallow-luau | Status | Luau notes |
-|---|---|---|---|
-| `schema` | `schema` | done | Capability manifest |
-| `list` | `list` | done | Files + require edges + unresolved dynamics |
-| `health` | `health` | done | Complexity, MI, SIG, hotspots, targets, score, baselines |
-| `dead-code` | `dead-code` | done | Unused files, returned keys, locals, types, cycles |
-| `dupes` | `dupes` | done | Token / suffix-array clones on `.lua`/`.luau` |
-| `audit` | `audit` | done | Dead + health + dupes; `--changed-since` |
-| `explain` | `explain` | done | Rule docs without re-running analysis |
-| `inspect` | `inspect` | done | Compose graph/complexity/dead/dupes for one path/key |
-| `trace` | `trace` | done | Bounded callers/callees on the require graph |
-| `watch` | `watch` | done | mtime poll → re-run audit |
-| `init` | `init` | done | `.fallow-luau.json` or `fallow-luau.toml` |
-| `config` | `config` | done | Print resolved config |
-| `suppressions` | `suppressions` | done | Inventory `-- fallow-luau-ignore*` markers |
-| `report` | `report` | done | Re-render saved JSON (json/compact/markdown) |
-| `flags` | `flags` | done | FF_/FeatureFlag/GetAttribute/settings/getenv |
-| `viz` | `viz` | done | Self-contained HTML treemap + require graph |
-| `fix` | — | skip/later | Auto-remove unused keys |
-| `mcp` / `fallow-mcp` | `mcp` | done | stdio MCP wrapping the same library |
-| CSS / npm / TS / knip / Cloud / React… | — | skip | Per SPEC |
+Tests are in [`tests`](../tests); small source examples are in [`tests/fixtures`](../tests/fixtures). Test success establishes these behaviors, not general agent productivity.
 
-## Health metrics (1:1 math)
+## Useful gaps still open
 
-| Metric | Formula / rule | Status |
-|---|---|---|
-| Cyclomatic | `1 +` decision points | done |
-| Cognitive | SonarSource-style + nesting (Luau CF) | done |
-| Density | `total_cc / lines` | done |
-| Maintainability Index | `100 - dens×30 - dead×20 - min(ln(fan_out+1)×4, 15)` | done |
-| SIG unit size | 1–15 / 16–30 / 31–60 / >60 | done |
-| SIG interfacing | 0–2 / 3–4 / 5–6 / 7+ | done |
-| CRAP | `CC²×(1−cov/100)³+CC`; default `static_estimated` | done |
-| Hotspots | `norm_churn × norm_density × 100`; 90-day half-life | done |
-| Trend | accelerating / stable / cooling | done |
-| Targets + effort | Same weights / effort rules | done |
-| Health score (project letter) | Penalty table v2; A–F grades | done |
-| Baselines / snapshots | `--baseline` / `--save-baseline` on targets | done |
+These are explicit gaps, not silently classified as done:
 
-## Dead code (adapted graph)
+| Gap | Why it matters / current substitute |
+|---|---|
+| Full lexical and value-flow analysis | Unused locals/types still use name-based approximations. Module-table mutation, control-flow assignments, re-exports and indirect consumers are incomplete. Findings require consumer inspection before deletion. |
+| Complete symbol call graph | [Fallow trace](https://fallow.tools/docs/cli/trace/) follows finer-grained relationships. Here only direct imported literal-key references are precise; transitive callers and all callees are module dependencies. Same-module calls are not resolved. |
+| Roblox/Rojo/alias adapters | Core only resolves literal filesystem, dotted, `@self` and `init` paths. Instance-based requires and custom wrappers stay unresolved; this can materially reduce usefulness in Roblox projects. No plugin installation is implied. |
+| Rules and suppression hygiene | No error/warn/off configuration, per-file health threshold overrides, stale-known-marker detection or unknown-kind diagnostics. Use entry/ignore globs and known inline kinds; inspect the suppression inventory. See [suppression docs](https://fallow.tools/docs/configuration/suppression/). |
+| Audit attribution refinements | Comparison is against the explicit ref, without automatic base discovery, rename mapping, supplied-diff support or added-line clone demotion. Clone restructuring may still produce an introduced warning. See [audit docs](https://fallow.tools/docs/cli/audit/). |
+| Review and impact workflows | No dedicated impact, review-brief, decision-surface or error-trace commands. Current agents compose list, health targets, inspect and trace; no equivalence claim. |
+| Complete clone analysis | Only the current normalized-literal token mode; no strict/renamed-identifier/semantic modes, clone-family triage or performance claim for large corpora. See [duplication docs](https://fallow.tools/docs/cli/dupes/). |
+| Full health parity | No module-scope complexity population or exact per-function test attribution. Cognitive rules and all aggregate metrics have not been exhaustively checked against Fallow. |
+| Watch/config changes and output formats | Polling watch tracks source mtimes, not every analysis input. Saved reports support JSON/compact/Markdown, not Fallow's complete SARIF/CI formatter set. |
 
-| Fallow | Luau equivalent | Status |
-|---|---|---|
-| Unused file | Unreachable from entry points | done |
-| Unused export | Unused key on returned module table | done |
-| Unused type | Luau `type` / `export type` never referenced | done |
-| Unused local | Local binding never read (nested included) | done |
-| Unused dependency (npm) | — | skip |
-| Circular import | Require-graph cycle, no depth limit | done |
-| CSS / class members / Pinia / … | — | skip |
+These gaps prevent a claim of “no useful parity gaps.” The implemented fixes address concrete failures in the existing product; the remaining capabilities require further implementation and evidence.
 
-## Graph / resolvers
+## Deliberate scope exclusions
 
-| Concept | Core | Plugin |
-|---|---|---|
-| `require("…")` string literal | yes | — |
-| Dynamic `require` / `loadstring` | unresolved edge | — |
-| Rojo paths / sourcemap | — | optional |
-| Custom import wrappers | — | optional |
+Per [`SPEC.md`](../SPEC.md), CSS/framework analysis, npm dependency checking, TypeScript checking, Fallow Cloud, Node bindings and JS runtime integrations are excluded. Runtime coverage needs a Luau coverage format before it can be supported. Automatic code removal is not implemented; static candidates alone are insufficient proof of a safe fix.
 
-## MCP tools
+## Configuration examples
 
-| Fallow MCP | fallow-luau MCP | Status |
-|---|---|---|
-| schema | `schema` | done |
-| list | `list_project` | done |
-| `check_health` | `check_health` | done |
-| dead-code | `find_dead_code` | done |
-| `find_dupes` | `find_dupes` | done |
-| `audit` | `audit` | done |
-| explain | `explain` | done |
-| inspect | `inspect` | done |
-| trace | `trace` | done |
-| flags | `flags` | done |
-| CSS / runtime / fix / knip… | — | skip |
+```json
+{
+  "entry": ["src/main.luau"],
+  "ignore": ["vendor/**"],
+  "health": {"max_cyclomatic": 20, "max_cognitive": 15, "max_crap": 30, "max_unit_size": 60},
+  "boundaries": [
+    {"name": "core", "paths": ["src/core/**"], "allow_imports_from": []},
+    {"name": "ui", "paths": ["src/ui/**"], "allow_imports_from": ["core"]}
+  ]
+}
+```
 
-## `_meta`
+Zone names and paths above are examples, not default project policy. An empty allow-list permits same-zone imports but denies imports into other matched zones.
 
-Every JSON command with `--explain`, and every MCP tool response, includes `_meta`.
+```lua
+-- fallow-ignore-next-line unused-local -- compatibility placeholder
+local retained = 1
 
-## Build order (SPEC)
+-- fallow-luau-ignore-file complexity, coverage-gaps -- generated state machine
+```
 
-1–6 all **done** for the Luau-adapted surface. Optional later: `fix`, Rojo resolver plugins, richer type-aware unused detection.
+Accepted kinds include `unused-file`, `unused-export`, `unused-local`, `unused-type`, `circular-dependency` (file scope), `boundary-violation`, `complexity`, individual complexity rule IDs, `coverage-gaps`, `large-function`, `code-duplication`, `feature-flag`, and `all`. File-wide markers apply regardless of their position. A next-line marker addresses exactly the next source line. Suppressions affect findings, not raw function complexity or size profiles.
+
+```bash
+fallow-luau audit --changed-since HEAD --gate new-only --explain
+fallow-luau audit --changed-since main --gate all
+fallow-luau trace src/module.luau --key create --depth 2
+```
+
+Without `--changed-since`, audit reports and gates the whole project. With it, `new-only` is the default. Findings stay in the report even when inherited; `attribution` determines which findings affect the verdict. An unreadable or invalid base fails rather than silently passing.
+
+## Agent-value evidence
+
+The [comparison report](../evaluation/results/comparison.md) records **9 validated repairs with the tool versus 7 without** across three broader public-project reviews, with mixed per-project results. Those runs used frozen binaries recorded in their manifests. They predate this parity update: do not present them as a new measurement of these changes. Refactoring-only gain, cost reduction and broad causal improvement remain unproven.

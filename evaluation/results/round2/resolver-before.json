@@ -1,0 +1,48 @@
+{
+  "edge_count": 3,
+  "edges": [
+    {
+      "from": "main.luau",
+      "kind": "string_literal",
+      "line": 1,
+      "specifier": "./package",
+      "to": "package/init.luau"
+    },
+    {
+      "from": "package/init.luau",
+      "kind": "string_literal",
+      "line": 1,
+      "specifier": "@self/child"
+    },
+    {
+      "from": "package/init.luau",
+      "kind": "string_literal",
+      "line": 2,
+      "specifier": "./sibling.spec"
+    }
+  ],
+  "file_count": 4,
+  "files": [
+    "main.luau",
+    "package/child.luau",
+    "package/init.luau",
+    "sibling.spec.luau"
+  ],
+  "root": "\\\\?\\C:\\Users\\asher\\Documents\\ChatGPT\\fallow-luau\\tests\\fixtures\\module_paths",
+  "schema_version": 1,
+  "unresolved": [
+    {
+      "from": "package/init.luau",
+      "kind": "string_literal",
+      "line": 1,
+      "specifier": "@self/child"
+    },
+    {
+      "from": "package/init.luau",
+      "kind": "string_literal",
+      "line": 2,
+      "specifier": "./sibling.spec"
+    }
+  ],
+  "unresolved_count": 2
+}

@@ -1,0 +1,124 @@
+diff --git a/tests/EventQueue.spec.luau b/tests/EventQueue.spec.luau
+index 2a1ba10..85e11a4 100644
+--- a/tests/EventQueue.spec.luau
++++ b/tests/EventQueue.spec.luau
+@@ -138,6 +138,90 @@ h.test("EventQueue: halves the batch size on 413", function()
+     h.expectEqual(#transport.calls[2].batch, 1, "batch size reduced to 1")
+ end)
+ 
++h.test("EventQueue: discards an irreducible 413 and sends following events", function()
++    local transport = fakeTransport({
++        { ok = false, statusCode = 413 },
++        { ok = true, statusCode = 200 },
++    })
++    local queue = newQueue(makeConfig({ maxBatchSize = 1 }), transport, (fakeClock()))
++    queue:enqueue(event("oversized"))
++    queue:enqueue(event("next"))
++    queue:flush()
++
++    h.expectEqual(#transport.calls, 2)
++    h.expectEqual(transport.calls[1].batch[1].event, "oversized")
++    h.expectEqual(transport.calls[2].batch[1].event, "next")
++    h.expectEqual(queue:count(), 0)
++end)
++
++local function overflowDuringFirstSend(firstStatus, clearInstead)
++    local calls = {}
++    local queue
++    local clock, setSeconds = fakeClock()
++    local transport = {
++        sendBatch = function(_, payload)
++            local names = {}
++            for _, item in payload.batch do
++                table.insert(names, item.event)
++            end
++            table.insert(calls, table.concat(names, ","))
++            if #calls == 1 then
++                if clearInstead then
++                    queue:clear()
++                end
++                queue:enqueue(event("c"))
++                h.expectEqual(
++                    queue:count(),
++                    if clearInstead then 1 else 2,
++                    "queue remains bounded while HTTP is in flight"
++                )
++            end
++            return {
++                ok = firstStatus == 200 or #calls > 1,
++                statusCode = if #calls == 1 then firstStatus else 200,
++            }
++        end,
++    }
++    queue = newQueue(makeConfig({ maxQueueSize = 2, maxBatchSize = 2 }), transport, clock)
++    queue:enqueue(event("a"))
++    queue:enqueue(event("b"))
++    return queue, calls, setSeconds
++end
++
++h.test("EventQueue: success during overflow never loses the newer event", function()
++    local queue, calls = overflowDuringFirstSend(200, false)
++    queue:flush()
++    h.expectEqual(calls, { "a,b", "c" })
++    h.expectEqual(queue:count(), 0)
++end)
++
++h.test("EventQueue: retry during overflow retains newer events in order", function()
++    local queue, calls, setSeconds = overflowDuringFirstSend(500, false)
++    queue:flush()
++    h.expectEqual(calls, { "a,b" })
++    h.expectEqual(queue:count(), 2)
++    h.expectEqual(queue._events[1].event, "b")
++    h.expectEqual(queue._events[2].event, "c")
++    setSeconds(100)
++    queue:flush()
++    h.expectEqual(calls, { "a,b", "b,c" })
++    h.expectEqual(queue:count(), 0)
++end)
++
++h.test("EventQueue: drop during overflow only removes the sent batch", function()
++    local queue, calls = overflowDuringFirstSend(400, false)
++    queue:flush()
++    h.expectEqual(calls, { "a,b", "c" })
++    h.expectEqual(queue:count(), 0)
++end)
++
++h.test("EventQueue: clear during send does not remove a later enqueue", function()
++    local queue, calls = overflowDuringFirstSend(200, true)
++    queue:flush()
++    h.expectEqual(calls, { "a,b", "c" })
++    h.expectEqual(queue:count(), 0)
++end)
++
+ h.test("EventQueue: drops the oldest event when over capacity", function()
+     local transport = fakeTransport({ { ok = true, statusCode = 200 } })
+     local queue = newQueue(
+diff --git a/tests/FlagCache.spec.luau b/tests/FlagCache.spec.luau
+index 59e01ca..8adb2a5 100644
+--- a/tests/FlagCache.spec.luau
++++ b/tests/FlagCache.spec.luau
+@@ -71,4 +71,24 @@ h.test("FlagCache: non-empty quotaLimited clears all flags", function()
+     h.expectEqual(store.requestId, "req-3", "request metadata still updated")
+ end)
+ 
++h.test("FlagCache: successful refresh removes absent flags, payloads, and details", function()
++    local store = FlagCache.empty()
++    FlagCache.applyResponse(store, {
++        flags = {
++            old = {
++                enabled = true,
++                metadata = { id = 1, payload = { version = 1 } },
++            },
++        },
++        requestId = "first",
++    })
++    FlagCache.applyResponse(store, { featureFlags = { current = false }, requestId = "second" })
++
++    h.expectNil(FlagCache.getValue(store, "old"))
++    h.expectNil(FlagCache.getPayload(store, "old"))
++    h.expectNil(FlagCache.getDetails(store, "old"))
++    h.expectFalse(FlagCache.getValue(store, "current"))
++    h.expectEqual(store.requestId, "second")
++end)
++
+ return true

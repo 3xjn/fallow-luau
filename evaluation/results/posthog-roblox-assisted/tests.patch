@@ -1,0 +1,36 @@
+diff --git a/tests/FlagCache.spec.luau b/tests/FlagCache.spec.luau
+index 59e01ca..68433aa 100644
+--- a/tests/FlagCache.spec.luau
++++ b/tests/FlagCache.spec.luau
+@@ -71,4 +71,31 @@ h.test("FlagCache: non-empty quotaLimited clears all flags", function()
+     h.expectEqual(store.requestId, "req-3", "request metadata still updated")
+ end)
+ 
++h.test("FlagCache: a new response replaces removed values, payloads, and details", function()
++    local store = FlagCache.empty()
++    FlagCache.applyResponse(store, {
++        flags = {
++            old = {
++                enabled = true,
++                metadata = { id = 1, payload = { text = "old" } },
++            },
++            retained = {
++                enabled = true,
++                metadata = { id = 2, payload = { text = "before" } },
++            },
++        },
++    })
++
++    FlagCache.applyResponse(store, {
++        flags = { retained = { enabled = false } },
++    })
++
++    h.expectNil(FlagCache.getValue(store, "old"), "removed flag is no longer cached")
++    h.expectNil(FlagCache.getPayload(store, "old"), "removed payload is no longer cached")
++    h.expectNil(FlagCache.getDetails(store, "old"), "removed details are no longer cached")
++    h.expectEqual(FlagCache.getValue(store, "retained"), false)
++    h.expectNil(FlagCache.getPayload(store, "retained"), "omitted payload is no longer cached")
++    h.expectNil(FlagCache.getDetails(store, "retained"), "omitted details are no longer cached")
++end)
++
+ return true

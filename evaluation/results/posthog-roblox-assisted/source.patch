@@ -1,0 +1,29 @@
+diff --git a/src/Server/FlagCache.luau b/src/Server/FlagCache.luau
+index b855be6..80711cc 100644
+--- a/src/Server/FlagCache.luau
++++ b/src/Server/FlagCache.luau
+@@ -38,7 +38,7 @@ local function resolveV4Value(flag: any): boolean | string
+     return flag.enabled == true
+ end
+ 
+--- Merges a decoded /flags response into the store (in place).
++-- Replaces the store with a decoded /flags response (in place).
+ function FlagCache.applyResponse(store, response)
+     if type(response) ~= "table" then
+         return
+@@ -47,11 +47,12 @@ function FlagCache.applyResponse(store, response)
+     store.requestId = response.requestId
+     store.evaluatedAt = response.evaluatedAt
+ 
++    table.clear(store.values)
++    table.clear(store.payloads)
++    table.clear(store.details)
++
+     -- Quota limited: clear everything, keep request metadata.
+     if isNonEmptyArray(response.quotaLimited) then
+-        table.clear(store.values)
+-        table.clear(store.payloads)
+-        table.clear(store.details)
+         return
+     end
+ 
