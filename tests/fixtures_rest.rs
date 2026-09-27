@@ -15,9 +15,10 @@ fn fixtures(name: &str) -> PathBuf {
 }
 
 #[test]
-fn schema_marks_parity_complete() {
+fn schema_discloses_experimental_status_and_available_commands() {
     let s = schema_manifest(false);
-    assert_eq!(s["status"], "parity-complete");
+    assert_eq!(s["status"], "experimental");
+    assert!(!s["limitations"].as_array().unwrap().is_empty());
     let names: Vec<_> = s["commands"]
         .as_array()
         .unwrap()
@@ -25,7 +26,15 @@ fn schema_marks_parity_complete() {
         .map(|c| c["name"].as_str().unwrap())
         .collect();
     for need in [
-        "inspect", "trace", "watch", "init", "config", "suppressions", "report", "flags", "viz",
+        "inspect",
+        "trace",
+        "watch",
+        "init",
+        "config",
+        "suppressions",
+        "report",
+        "flags",
+        "viz",
     ] {
         assert!(names.contains(&need), "missing {need} in {names:?}");
         let cmd = s["commands"]
@@ -34,7 +43,7 @@ fn schema_marks_parity_complete() {
             .iter()
             .find(|c| c["name"] == need)
             .unwrap();
-        assert_eq!(cmd["status"], "done");
+        assert_eq!(cmd["status"], "available");
     }
 }
 

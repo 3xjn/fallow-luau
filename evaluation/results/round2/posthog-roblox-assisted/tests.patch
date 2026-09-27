@@ -1,0 +1,355 @@
+diff --git a/tests/EventQueue.spec.luau b/tests/EventQueue.spec.luau
+index 2a1ba10..595e988 100644
+--- a/tests/EventQueue.spec.luau
++++ b/tests/EventQueue.spec.luau
+@@ -171,4 +171,97 @@ h.test("EventQueue: clear empties the queue", function()
+     h.expectEqual(queue:count(), 0)
+ end)
+ 
++h.test("EventQueue: success removes only sent events after overflow during send", function()
++    local queue
++    local sent = {}
++    local transport = {
++        sendBatch = function(_, payload)
++            for _, item in payload.batch do table.insert(sent, item.event) end
++            if #sent == 2 then queue:enqueue(event("c")) end
++            return { statusCode = 200 }
++        end,
++    }
++    queue = newQueue(makeConfig({ maxQueueSize = 2 }), transport, (fakeClock()))
++    queue:enqueue(event("a"))
++    queue:enqueue(event("b"))
++    queue:flush()
++    h.expectEqual(sent, { "a", "b", "c" })
++    h.expectEqual(queue:count(), 0)
++end)
++
++h.test("EventQueue: drop response preserves newer event after overflow", function()
++    local queue
++    local sent = {}
++    local calls = 0
++    local transport = {
++        sendBatch = function(_, payload)
++            calls += 1
++            for _, item in payload.batch do table.insert(sent, item.event) end
++            if calls == 1 then
++                queue:enqueue(event("c"))
++                return { statusCode = 400 }
++            end
++            return { statusCode = 200 }
++        end,
++    }
++    queue = newQueue(makeConfig({ maxQueueSize = 2 }), transport, (fakeClock()))
++    queue:enqueue(event("a"))
++    queue:enqueue(event("b"))
++    queue:flush()
++    h.expectEqual(sent, { "a", "b", "c" })
++    h.expectEqual(queue:count(), 0)
++end)
++
++h.test("EventQueue: retry retains surviving events within capacity", function()
++    local clock, advance = fakeClock()
++    local queue
++    local sent = {}
++    local calls = 0
++    local transport = {
++        sendBatch = function(_, payload)
++            calls += 1
++            for _, item in payload.batch do table.insert(sent, item.event) end
++            if calls == 1 then
++                queue:enqueue(event("c"))
++                return { statusCode = 500 }
++            end
++            return { statusCode = 200 }
++        end,
++    }
++    queue = newQueue(makeConfig({ maxQueueSize = 2 }), transport, clock)
++    queue:enqueue(event("a"))
++    queue:enqueue(event("b"))
++    queue:flush()
++    h.expectEqual(queue:count(), 2)
++    h.expectEqual(queue._events[1].event, "b")
++    h.expectEqual(queue._events[2].event, "c")
++    advance(100)
++    queue:flush()
++    h.expectEqual(sent, { "a", "b", "b", "c" })
++    h.expectEqual(queue:count(), 0)
++end)
++
++h.test("EventQueue: clear during send leaves only later captures", function()
++    local queue
++    local sent = {}
++    local calls = 0
++    local transport = {
++        sendBatch = function(_, payload)
++            calls += 1
++            for _, item in payload.batch do table.insert(sent, item.event) end
++            if calls == 1 then
++                queue:clear()
++                queue:enqueue(event("c"))
++            end
++            return { statusCode = 200 }
++        end,
++    }
++    queue = newQueue(makeConfig({ maxQueueSize = 2 }), transport, (fakeClock()))
++    queue:enqueue(event("a"))
++    queue:enqueue(event("b"))
++    queue:flush()
++    h.expectEqual(sent, { "a", "b", "c" })
++    h.expectEqual(queue:count(), 0)
++end)
++
+ return true
+diff --git a/tests/FeatureFlags.spec.luau b/tests/FeatureFlags.spec.luau
+new file mode 100644
+index 0000000..330ba65
+--- /dev/null
++++ b/tests/FeatureFlags.spec.luau
+@@ -0,0 +1,85 @@
++-- Load the unchanged Roblox-bound module with only its requires supplied.
++local h = require("./helper")
++local fs = require("@lune/fs")
++local luau = require("@lune/luau")
++local FlagCache = require("../src/Server/FlagCache")
++local Defaults = require("../src/Shared/Defaults")
++local Version = require("../src/Shared/Version")
++
++local scriptRef = {
++    Parent = {
++        FlagCache = "FlagCache",
++        Parent = { Shared = { Defaults = "Defaults", Version = "Version" } },
++    },
++}
++local modules = { FlagCache = FlagCache, Defaults = Defaults, Version = Version }
++local FeatureFlags = luau.load(fs.readFile("src/Server/FeatureFlags.luau"), {
++    environment = {
++        script = scriptRef,
++        require = function(name) return modules[name] end,
++    },
++})()
++
++local function state()
++    return {
++        distinctId = "123",
++        personPropertiesForFlags = {},
++        groupPropertiesForFlags = {},
++        flagCalled = {},
++        groupsOrNil = function() return nil end,
++    }
++end
++
++local function newFlags(fetch)
++    return FeatureFlags.new({
++        config = { projectKey = "phc_test", sendDefaultPersonPropertiesForFlags = false },
++        transport = { fetchFlags = fetch },
++        logger = { debug = function() end, warn = function() end },
++        capture = function() end,
++    })
++end
++
++h.test("FeatureFlags: stale successful reload cannot overwrite newer success", function()
++    local calls = 0
++    local flags = newFlags(function()
++        calls += 1
++        if calls == 1 then
++            coroutine.yield()
++            return { ok = true, statusCode = 200, body = { featureFlags = { tier = "old" } } }
++        end
++        return { ok = true, statusCode = 200, body = { featureFlags = { tier = "new" } } }
++    end)
++    local playerState = state()
++    local oldResult
++    local first = coroutine.create(function() oldResult = flags:reload(playerState) end)
++    h.expectTrue((coroutine.resume(first)))
++    h.expectTrue(flags:reload(playerState))
++    h.expectTrue((coroutine.resume(first)))
++    h.expectEqual(flags:getValue(playerState, "tier"), "new")
++    h.expectFalse(oldResult, "superseded response was not applied")
++end)
++
++h.test("FeatureFlags: failed newer reload leaves prior cache and rejects older response", function()
++    local calls = 0
++    local flags = newFlags(function()
++        calls += 1
++        if calls == 1 then
++            return { ok = true, statusCode = 200, body = { featureFlags = { tier = "cached" } } }
++        elseif calls == 2 then
++            coroutine.yield()
++            return { ok = true, statusCode = 200, body = { featureFlags = { tier = "stale" } } }
++        end
++        return { ok = false, statusCode = 500 }
++    end)
++    local playerState = state()
++    h.expectTrue(flags:reload(playerState))
++    local oldResult
++    local older = coroutine.create(function() oldResult = flags:reload(playerState) end)
++    h.expectTrue((coroutine.resume(older)))
++    h.expectFalse(flags:reload(playerState))
++    h.expectTrue((coroutine.resume(older)))
++    h.expectFalse(oldResult)
++    h.expectEqual(flags:getValue(playerState, "tier"), "cached")
++end)
++
++return true
+diff --git a/tests/FlagCache.spec.luau b/tests/FlagCache.spec.luau
+index 59e01ca..91e48d1 100644
+--- a/tests/FlagCache.spec.luau
++++ b/tests/FlagCache.spec.luau
+@@ -71,4 +71,22 @@ h.test("FlagCache: non-empty quotaLimited clears all flags", function()
+     h.expectEqual(store.requestId, "req-3", "request metadata still updated")
+ end)
+ 
++h.test("FlagCache: ordinary response replaces prior flags, payloads, and details", function()
++    local store = FlagCache.empty()
++    FlagCache.applyResponse(store, {
++        flags = {
++            retired = { enabled = true, metadata = { payload = { old = true }, id = 1 } },
++            live = { enabled = true, metadata = { payload = { old = true }, id = 2 } },
++        },
++    })
++    FlagCache.applyResponse(store, { flags = { live = { enabled = false } } })
++
++    h.expectNil(FlagCache.getValue(store, "retired"))
++    h.expectNil(FlagCache.getPayload(store, "retired"))
++    h.expectNil(FlagCache.getDetails(store, "retired"))
++    h.expectFalse(FlagCache.getValue(store, "live"))
++    h.expectNil(FlagCache.getPayload(store, "live"))
++    h.expectNil(FlagCache.getDetails(store, "live"))
++end)
++
+ return true
+diff --git a/tests/ServerGroup.spec.luau b/tests/ServerGroup.spec.luau
+new file mode 100644
+index 0000000..98dd3cb
+--- /dev/null
++++ b/tests/ServerGroup.spec.luau
+@@ -0,0 +1,116 @@
++-- Public Group path using unchanged Server/init.luau with Roblox services stubbed.
++local h = require("./helper")
++local fs = require("@lune/fs")
++local luau = require("@lune/luau")
++local Defaults = require("../src/Shared/Defaults")
++local FlagCache = require("../src/Server/FlagCache")
++local PlayerState = require("../src/Server/PlayerState")
++local Session = require("../src/Server/Session")
++local Version = require("../src/Shared/Version")
++
++local flagsScript = {
++    Parent = {
++        FlagCache = "FlagCache",
++        Parent = { Shared = { Defaults = "Defaults", Version = "Version" } },
++    },
++}
++local FeatureFlags = luau.load(fs.readFile("src/Server/FeatureFlags.luau"), {
++    environment = {
++        script = flagsScript,
++        require = function(name)
++            return ({ FlagCache = FlagCache, Defaults = Defaults, Version = Version })[name]
++        end,
++    },
++})()
++
++local capturedBody
++local states = {}
++local registry = {
++    get = function(_, id) return states[id] end,
++    getOrCreate = function(_, id, info)
++        if not states[id] then states[id] = PlayerState.new(id, info) end
++        return states[id]
++    end,
++}
++local noop = function() end
++local logger = { warn = noop, info = noop, debug = noop, error = noop }
++local modules = {
++    Defaults = Defaults,
++    Logger = { new = function() return logger end },
++    Uuid = { new = function() return { generate = function() return "uuid" end } end },
++    RetryPolicy = require("../src/Shared/RetryPolicy"),
++    Version = Version,
++    Sanitize = require("../src/Shared/Sanitize"),
++    Context = { new = function() return { base = function() return {} end } end },
++    Transport = { new = function()
++        return { fetchFlags = function(_, body)
++            capturedBody = body
++            return { ok = true, statusCode = 200, body = { featureFlags = {} } }
++        end }
++    end },
++    EventQueue = { new = function()
++        return { enqueue = noop, shouldFlush = function() return false end,
++            flush = noop, count = function() return 0 end }
++    end },
++    PlayerRegistry = { new = function() return registry end },
++    Session = Session,
++    FlagCache = FlagCache,
++    FeatureFlags = FeatureFlags,
++    ExceptionBuilder = require("../src/Server/ExceptionBuilder"),
++    ErrorTracking = { new = function() return { start = noop, stop = noop } end },
++    Autocapture = { new = function() return { start = noop, stop = noop } end },
++    RelayServer = { new = function() return { start = noop, stop = noop } end },
++    MemoryStorage = { new = function() return {} end },
++    Types = {},
++}
++local shared = {}
++for _, name in { "Defaults", "Logger", "Uuid", "RetryPolicy", "Version", "Sanitize", "Types" } do
++    shared[name] = name
++end
++local scriptRef = { Parent = { Shared = shared }, Storage = { MemoryStorage = "MemoryStorage" } }
++for _, name in { "Context", "Transport", "EventQueue", "PlayerRegistry", "Session", "FlagCache",
++    "FeatureFlags", "ExceptionBuilder", "ErrorTracking", "Autocapture", "RelayServer" } do
++    scriptRef[name] = name
++end
++local game = {
++    GetService = function(_, name)
++        if name == "RunService" then return { IsServer = function() return true end } end
++        if name == "Players" then
++            return { GetPlayers = function() return {} end, MaxPlayers = 10 }
++        end
++    end,
++    BindToClose = noop,
++    PrivateServerId = "",
++}
++local PostHog = luau.load(fs.readFile("src/Server/init.luau"), {
++    environment = {
++        script = scriptRef,
++        require = function(name) return modules[name] end,
++        game = game,
++        Random = { new = function()
++            return { NextInteger = function() return 0 end }
++        end },
++        DateTime = { now = function()
++            return { UnixTimestampMillis = 1000, ToIsoDate = function() return "now" end }
++        end },
++        task = { spawn = noop, wait = noop },
++    },
++})()
++
++h.test("Server Group passes provided group properties into flags request", function()
++    PostHog:Init({ projectKey = "phc_test", allowClientEvents = false,
++        captureErrors = false, captureLifecycleEvents = false, preloadFeatureFlags = false })
++    local properties = { tier = "gold" }
++    PostHog:Group("player-1", "guild", "guild_42", properties)
++    properties.tier = "silver"
++    h.expectTrue(PostHog:ReloadFeatureFlags("player-1"))
++    h.expectEqual(capturedBody["$groups"].guild, "guild_42")
++    h.expectEqual(capturedBody.group_properties.guild.tier, "gold")
++
++    PostHog:Group("player-1", "guild", "guild_99")
++    h.expectTrue(PostHog:ReloadFeatureFlags("player-1"))
++    h.expectEqual(capturedBody["$groups"].guild, "guild_99")
++    h.expectNil(capturedBody.group_properties)
++end)
++
++return true
+diff --git a/tests/runTests.luau b/tests/runTests.luau
+index 3e8ba58..b26a3e1 100644
+--- a/tests/runTests.luau
++++ b/tests/runTests.luau
+@@ -30,6 +30,8 @@ coverage.instrument("MemoryStorage", require("../src/Server/Storage/MemoryStorag
+ require("./Uuid.spec")
+ require("./RetryPolicy.spec")
+ require("./FlagCache.spec")
++require("./FeatureFlags.spec")
++require("./ServerGroup.spec")
+ require("./ExceptionBuilder.spec")
+ require("./EventQueue.spec")
+ require("./Sanitize.spec")

@@ -18,8 +18,45 @@ pub struct Config {
     pub boundaries: Vec<BoundaryZone>,
 }
 
+impl Config {
+    pub fn health_options(&self) -> crate::health::HealthOptions {
+        crate::health::HealthOptions {
+            max_cyclomatic: self.health.max_cyclomatic,
+            max_cognitive: self.health.max_cognitive,
+            max_unit_size: self.health.max_unit_size,
+            max_crap: self.health.max_crap,
+            score: true,
+            ..Default::default()
+        }
+    }
+
+    pub fn dupes_options(&self) -> crate::dupes::DupesOptions {
+        crate::dupes::DupesOptions {
+            min_tokens: self.duplicates.min_tokens,
+            min_lines: self.duplicates.min_lines,
+            ..Default::default()
+        }
+    }
+}
+
+pub(crate) fn path_patterns(patterns: &[String]) -> Result<globset::GlobSet, String> {
+    let mut builder = globset::GlobSetBuilder::new();
+    for pattern in patterns {
+        let pattern = pattern.replace('\\', "/");
+        builder.add(
+            globset::GlobBuilder::new(&pattern)
+                .literal_separator(true)
+                .build()
+                .map_err(|e| format!("invalid glob {pattern}: {e}"))?,
+        );
+    }
+    builder.build().map_err(|e| e.to_string())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthConfig {
+    #[serde(default = "default_max_crap")]
+    pub max_crap: f64,
     #[serde(default = "default_max_cyclomatic")]
     pub max_cyclomatic: u32,
     #[serde(default = "default_max_cognitive")]
@@ -31,6 +68,7 @@ pub struct HealthConfig {
 impl Default for HealthConfig {
     fn default() -> Self {
         Self {
+            max_crap: default_max_crap(),
             max_cyclomatic: default_max_cyclomatic(),
             max_cognitive: default_max_cognitive(),
             max_unit_size: default_max_unit_size(),
@@ -40,6 +78,9 @@ impl Default for HealthConfig {
 
 fn default_max_cyclomatic() -> u32 {
     20
+}
+fn default_max_crap() -> f64 {
+    30.0
 }
 fn default_max_cognitive() -> u32 {
     15
@@ -99,8 +140,8 @@ pub fn load_config(root: &Path) -> Result<ResolvedConfig, String> {
         if !path.is_file() {
             continue;
         }
-        let text = std::fs::read_to_string(&path)
-            .map_err(|e| format!("read {}: {e}", path.display()))?;
+        let text =
+            std::fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
         let config = if path.extension().and_then(|e| e.to_str()) == Some("json") {
             serde_json::from_str(&text).map_err(|e| format!("parse {}: {e}", path.display()))?
         } else {
@@ -121,9 +162,8 @@ pub fn init_config(root: &Path, format: InitFormat) -> Result<PathBuf, String> {
     let (path, body) = match format {
         InitFormat::Json => {
             let path = root.join(".fallow-luau.json");
-            let body = serde_json::to_string_pretty(&Config::default())
-                .map_err(|e| e.to_string())?
-                + "\n";
+            let body =
+                serde_json::to_string_pretty(&Config::default()).map_err(|e| e.to_string())? + "\n";
             (path, body)
         }
         InitFormat::Toml => {

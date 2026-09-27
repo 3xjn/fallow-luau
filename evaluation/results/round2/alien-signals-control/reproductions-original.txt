@@ -1,0 +1,6 @@
+initial effect error actual=C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src:204: attempt to call a string value expected=initial sentinel
+stopped queued effect runs actual=1 expected=1
+nested pause restoration runs actual=1 expected=2
+failed scope retained effect actual=2 expected=1
+failed effect retained subscription actual=2 expected=1
+rerun effect error actual=C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src:52: attempt to call a string value expected=rerun sentinel

@@ -5,6 +5,7 @@
 //! Parity map: `docs/parity.md`.
 
 mod audit;
+mod boundaries;
 mod complexity;
 mod config;
 mod dead_code;
@@ -19,6 +20,7 @@ mod inspect;
 mod mcp;
 mod meta;
 mod project;
+mod references;
 mod report;
 mod resolve;
 mod suppressions;
@@ -26,13 +28,11 @@ mod trace;
 mod viz;
 mod watch;
 
-pub use audit::{analyze_audit, AuditOptions, AuditReport, AuditVerdict};
+pub use audit::{analyze_audit, AuditGate, AuditOptions, AuditReport, AuditVerdict};
 pub use complexity::{analyze_functions, FunctionMetrics, RiskBin, RiskProfile};
-pub use config::{
-    init_config, load_config, Config, InitFormat, ResolvedConfig,
-};
+pub use config::{init_config, load_config, Config, InitFormat, ResolvedConfig};
 pub use dead_code::{analyze_dead_code, DeadCodeOptions, DeadCodeReport, DeadKind};
-pub use discover::{discover_files, is_luau_source, is_test_path};
+pub use discover::{discover_configured_files, discover_files, is_luau_source, is_test_path};
 pub use dupes::{analyze_dupes, CloneGroup, DupesOptions, DupesReport};
 pub use emit::{render_saved_report, ReportFormat};
 pub use explain::{explain_rule, known_rules};

@@ -16,16 +16,16 @@ Do not invent new scoring. Copy the published formulas. Adapt only how Luau modu
 | Surface | Notes |
 |---|---|
 | Cyclomatic / cognitive / density | Every function is a unit, including nested `local function`. |
-| Maintainability Index | `100 - (density × 30) - (dead_ratio × 20) - min(ln(fan_out+1)×4, 15)` |
+| Maintainability Index | `100 - density×30×min(lines/50,1) - dead_ratio×20 - min(ln(fan_out+1)×4,15)` |
 | Unit size / interfacing profiles | SIG bins. Flag functions over 60 lines. |
 | CRAP | `CC² × (1 − cov/100)³ + CC`. Default `static_estimated` from the test require graph. Real coverage later. |
 | Hotspots | `normalized_churn × normalized_density × 100`. Churn = recency-weighted commits, 90-day half-life. |
 | Trend | First half vs second half of the window: accelerating (>1.5×), cooling (<0.67×), stable. |
-| Targets + effort + baselines | Same priority weights and effort rules as Fallow. |
+| Targets + effort + baselines | Published percentile-based weights; rank by priority/effort; attach evidence; baseline errors must surface. |
 | Duplication | Token / suffix-array clones across `.lua` / `.luau`. |
 | Cycles | Require graph, no depth limit. |
 | Boundaries | Configurable directory zones. |
-| audit / inspect / trace / explain | Changed-file gate; symbol or function walk; rule docs. |
+| audit / inspect / trace / explain | Changed-file new-only/all gate; imported-key references and explicit module context; rule docs. Full call-graph parity remains open. |
 | watch / init / config / schema / list / suppressions / report | Same jobs as Fallow. |
 | MCP + JSON `_meta` | Agents must not need a second call for metric definitions. |
 | flags | Feature-flag and settings-gate detection, via plugins. |

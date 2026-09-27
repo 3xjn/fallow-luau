@@ -115,6 +115,11 @@ fn collect_block(block: &Block, stack: &mut Vec<String>, out: &mut Vec<FunctionM
     for stmt in block.stmts() {
         collect_stmt(stmt, stack, out);
     }
+    if let Some(full_moon::ast::LastStmt::Return(ret)) = block.last_stmt() {
+        for expr in ret.returns() {
+            collect_expression(expr, stack, out);
+        }
+    }
 }
 
 fn collect_stmt(stmt: &Stmt, stack: &mut Vec<String>, out: &mut Vec<FunctionMetrics>) {
@@ -227,9 +232,7 @@ fn collect_expression(expr: &Expression, stack: &mut Vec<String>, out: &mut Vec<
             collect_expression(lhs, stack, out);
             collect_expression(rhs, stack, out);
         }
-        Expression::UnaryOperator { expression, .. } => {
-            collect_expression(expression, stack, out)
-        }
+        Expression::UnaryOperator { expression, .. } => collect_expression(expression, stack, out),
         Expression::Parentheses { expression, .. } => collect_expression(expression, stack, out),
         Expression::FunctionCall(call) => collect_call(call, stack, out),
         Expression::IfExpression(if_expr) => {
@@ -256,9 +259,7 @@ fn collect_expression(expr: &Expression, stack: &mut Vec<String>, out: &mut Vec<
                 }
             }
         }
-        Expression::TypeAssertion { expression, .. } => {
-            collect_expression(expression, stack, out)
-        }
+        Expression::TypeAssertion { expression, .. } => collect_expression(expression, stack, out),
         Expression::Var(var) => collect_var(var, stack, out),
         Expression::InterpolatedString(s) => {
             for e in s.expressions() {
@@ -360,6 +361,11 @@ impl ComplexityScorer {
     fn score_block(&mut self, block: &Block, nesting: u32) {
         for stmt in block.stmts() {
             self.score_stmt(stmt, nesting);
+        }
+        if let Some(full_moon::ast::LastStmt::Return(ret)) = block.last_stmt() {
+            for expr in ret.returns() {
+                self.score_expression(expr, nesting);
+            }
         }
     }
 

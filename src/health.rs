@@ -22,6 +22,7 @@ pub struct HealthOptions {
     pub max_cyclomatic: u32,
     pub max_cognitive: u32,
     pub max_unit_size: usize,
+    pub max_crap: f64,
     pub explain: bool,
     pub hotspots: bool,
     pub targets: bool,
@@ -47,6 +48,11 @@ pub struct HealthOptions {
     /// Baseline path: only report targets not in baseline.
     pub baseline: Option<PathBuf>,
     pub save_baseline: Option<PathBuf>,
+    pub entry_points: Vec<String>,
+    pub cycle_paths: Vec<Vec<String>>,
+    pub export_counts: BTreeMap<String, usize>,
+    pub unused_export_names: BTreeMap<String, Vec<String>>,
+    pub clone_siblings: BTreeMap<String, Vec<serde_json::Value>>,
 }
 
 impl Default for HealthOptions {
@@ -55,6 +61,7 @@ impl Default for HealthOptions {
             max_cyclomatic: 20,
             max_cognitive: 15,
             max_unit_size: 60,
+            max_crap: 30.0,
             explain: false,
             hotspots: true,
             targets: true,
@@ -73,6 +80,11 @@ impl Default for HealthOptions {
             total_export_count: None,
             baseline: None,
             save_baseline: None,
+            entry_points: Vec::new(),
+            cycle_paths: Vec::new(),
+            export_counts: BTreeMap::new(),
+            unused_export_names: BTreeMap::new(),
+            clone_siblings: BTreeMap::new(),
         }
     }
 }
@@ -135,12 +147,16 @@ pub enum TargetCategory {
     RemoveDeadCode,
     Complexity,
     Coupling,
+    AddTestCoverage,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RefactorTarget {
     pub path: String,
     pub priority: f64,
+    pub efficiency: f64,
+    pub confidence: String,
+    pub evidence: serde_json::Value,
     pub recommendation: String,
     pub category: TargetCategory,
     pub effort: Effort,
@@ -164,6 +180,7 @@ pub struct ComplexityFinding {
     pub cyclomatic: u32,
     pub cognitive: u32,
     pub rule: String,
+    pub crap: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -187,6 +204,8 @@ pub struct HealthReport {
     pub schema_version: u32,
     pub root: String,
     pub files_analyzed: usize,
+    pub coverage_model: String,
+    pub unresolved_imports: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub findings: Option<Vec<ComplexityFinding>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -214,11 +233,19 @@ pub struct FileAnalysis {
 
 /// Maintainability Index (Fallow simplified).
 ///
-/// `MI = 100 - (density × 30) - (dead_ratio × 20) - min(ln(fan_out+1)×4, 15)`
+/// `MI = 100 - density×30×min(lines/50,1) - dead_ratio×20 - min(ln(fan_out+1)×4,15)`
 /// clamped to \[0, 100].
-pub fn maintainability_index(density: f64, dead_ratio: f64, fan_out: usize) -> f64 {
+pub fn maintainability_index_for_lines(
+    density: f64,
+    dead_ratio: f64,
+    fan_out: usize,
+    lines: usize,
+) -> f64 {
     let fan_out_penalty = ((fan_out as f64 + 1.0).ln() * 4.0).min(15.0);
-    let mi = 100.0 - (density * 30.0) - (dead_ratio * 20.0) - fan_out_penalty;
+    let mi = 100.0
+        - (density * 30.0 * (lines as f64 / 50.0).min(1.0))
+        - (dead_ratio * 20.0)
+        - fan_out_penalty;
     mi.clamp(0.0, 100.0)
 }
 
@@ -239,9 +266,11 @@ pub fn analyze_health(
     files: &[FileAnalysis],
     graph: &RequireGraph,
     opts: &HealthOptions,
-) -> HealthReport {
+) -> Result<HealthReport, String> {
     let fans = fan_counts(graph);
     let test_reach = static_coverage_estimates(graph, files);
+    let paths: Vec<_> = files.iter().map(|f| f.abs.clone()).collect();
+    let markers = crate::suppressions::load_markers(root, &paths)?;
 
     let mut all_functions = Vec::new();
     let mut file_scores = Vec::new();
@@ -251,14 +280,24 @@ pub fn analyze_health(
     for file in files {
         for f in &file.functions {
             all_functions.push((file.path.clone(), f.clone()));
-            if f.cyclomatic >= opts.max_cyclomatic || f.cognitive >= opts.max_cognitive {
-                let rule = if f.cyclomatic >= opts.max_cyclomatic && f.cognitive >= opts.max_cognitive
-                {
+            let suppressed =
+                |kind| crate::suppressions::suppresses(&markers, &file.path, f.line, kind);
+            let crap = crap_score(
+                f.cyclomatic,
+                test_reach.get(&file.path).copied().unwrap_or(0.0),
+            );
+            let cc =
+                f.cyclomatic >= opts.max_cyclomatic && !suppressed("high-cyclomatic-complexity");
+            let cog = f.cognitive >= opts.max_cognitive && !suppressed("high-cognitive-complexity");
+            if cc || cog || (crap >= opts.max_crap && !suppressed("high-crap")) {
+                let rule = if cc && cog {
                     "fallow-luau/high-complexity"
-                } else if f.cyclomatic >= opts.max_cyclomatic {
+                } else if cc {
                     "fallow-luau/high-cyclomatic-complexity"
-                } else {
+                } else if cog {
                     "fallow-luau/high-cognitive-complexity"
+                } else {
+                    "fallow-luau/high-crap"
                 };
                 findings.push(ComplexityFinding {
                     path: file.path.clone(),
@@ -268,9 +307,10 @@ pub fn analyze_health(
                     cyclomatic: f.cyclomatic,
                     cognitive: f.cognitive,
                     rule: rule.into(),
+                    crap: round2(crap),
                 });
             }
-            if f.lines > opts.max_unit_size {
+            if f.lines > opts.max_unit_size && !suppressed("large-function") {
                 large_functions.push(LargeFunction {
                     path: file.path.clone(),
                     name: f.name.clone(),
@@ -294,7 +334,7 @@ pub fn analyze_health(
             .as_ref()
             .and_then(|m| m.get(&file.path).copied())
             .unwrap_or(0.0);
-        let mi = maintainability_index(density, dead_ratio, fan_out);
+        let mi = maintainability_index_for_lines(density, dead_ratio, fan_out, lines);
 
         let cov = test_reach.get(&file.path).copied().unwrap_or(0.0);
         let mut crap_max = 0.0;
@@ -304,7 +344,9 @@ pub fn analyze_health(
             if score > crap_max {
                 crap_max = score;
             }
-            if score >= 30.0 {
+            if score >= opts.max_crap
+                && !crate::suppressions::suppresses(&markers, &file.path, f.line, "high-crap")
+            {
                 crap_above += 1;
             }
         }
@@ -373,6 +415,8 @@ pub fn analyze_health(
             &file_scores,
             hotspots.as_deref().unwrap_or(&[]),
             &all_functions,
+            opts,
+            graph,
         ))
     } else {
         None
@@ -380,12 +424,12 @@ pub fn analyze_health(
 
     if let Some(path) = &opts.save_baseline {
         if let Some(t) = targets.as_ref() {
-            let _ = save_targets_baseline(path, t);
+            save_targets_baseline(path, t)?;
         }
     }
     if let Some(path) = &opts.baseline {
         if let Some(t) = targets.as_mut() {
-            let known = load_targets_baseline(path).unwrap_or_default();
+            let known = load_targets_baseline(path)?;
             t.retain(|x| !known.contains(&baseline_key(x)));
         }
     }
@@ -408,10 +452,12 @@ pub fn analyze_health(
         None
     };
 
-    HealthReport {
+    Ok(HealthReport {
         schema_version: 1,
         root: root.display().to_string(),
         files_analyzed: files.len(),
+        coverage_model: "static_estimated".into(),
+        unresolved_imports: graph.unresolved.len(),
         findings: if opts.complexity {
             Some(findings)
         } else {
@@ -439,11 +485,42 @@ pub fn analyze_health(
         } else {
             None
         },
+    })
+}
+
+impl HealthOptions {
+    pub(crate) fn attach_evidence(
+        &mut self,
+        dead: &crate::dead_code::DeadCodeReport,
+        dupes: &crate::dupes::DupesReport,
+    ) {
+        for f in &dead.unused_exports {
+            self.unused_export_names
+                .entry(f.path.clone())
+                .or_default()
+                .push(f.name.clone());
+        }
+        for group in &dupes.clone_groups {
+            let paths: std::collections::BTreeSet<_> =
+                group.instances.iter().map(|i| &i.path).collect();
+            for path in paths {
+                self.clone_siblings
+                    .entry(path.clone())
+                    .or_default()
+                    .push(serde_json::json!({
+                        "fingerprint": group.fingerprint, "instances": group.instances,
+                    }));
+            }
+        }
     }
 }
 
 fn baseline_key(t: &RefactorTarget) -> String {
-    format!("{}:{}", t.path, format!("{:?}", t.category).to_ascii_lowercase())
+    format!(
+        "{}:{}",
+        t.path,
+        format!("{:?}", t.category).to_ascii_lowercase()
+    )
 }
 
 fn save_targets_baseline(path: &Path, targets: &[RefactorTarget]) -> Result<(), String> {
@@ -454,32 +531,33 @@ fn save_targets_baseline(path: &Path, targets: &[RefactorTarget]) -> Result<(), 
     }))
     .unwrap();
     if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("create baseline directory {}: {e}", parent.display()))?;
+        }
     }
     std::fs::write(path, body).map_err(|e| format!("write baseline {}: {e}", path.display()))
 }
 
 fn load_targets_baseline(path: &Path) -> Result<std::collections::BTreeSet<String>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("read baseline: {e}"))?;
-    let v: serde_json::Value =
-        serde_json::from_str(&text).map_err(|e| format!("parse baseline: {e}"))?;
-    let keys = v
-        .get("keys")
-        .and_then(|k| k.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
-    Ok(keys)
+    #[derive(serde::Deserialize)]
+    struct Baseline {
+        schema_version: u32,
+        keys: Vec<String>,
+    }
+    let v: Baseline = serde_json::from_str(&text).map_err(|e| format!("parse baseline: {e}"))?;
+    if v.schema_version != 1 {
+        return Err(format!("unsupported baseline schema {}", v.schema_version));
+    }
+    Ok(v.keys.into_iter().collect())
 }
 
 fn compute_health_score(
     total_files: usize,
     file_scores: &[FileScore],
-    findings: &[ComplexityFinding],
-    large_functions: &[LargeFunction],
+    _findings: &[ComplexityFinding],
+    _large_functions: &[LargeFunction],
     functions: &[FunctionMetrics],
     hotspots: &[Hotspot],
     fans: &BTreeMap<String, (usize, usize)>,
@@ -492,7 +570,7 @@ fn compute_health_score(
     let total_exports = opts.total_export_count.unwrap_or(0).max(1) as f64;
     let dead_export_pct = dead_exports * 100.0 / total_exports;
 
-    let critical = findings
+    let critical = functions
         .iter()
         .filter(|f| f.cyclomatic >= 50 || f.cognitive >= 30)
         .count() as f64;
@@ -515,7 +593,7 @@ fn compute_health_score(
     let circular = opts.circular_deps.unwrap_or(0) as f64;
     let circular_per_k = circular * 1000.0 / total_files;
 
-    let over60 = large_functions.len() as f64;
+    let over60 = functions.iter().filter(|f| f.lines > 60).count() as f64;
     let over60_per_k = over60 * 1000.0 / fn_total;
 
     let fan_ins: Vec<usize> = fans.values().map(|(fi, _)| *fi).collect();
@@ -572,10 +650,15 @@ fn static_coverage_estimates(
     // Direct test require → 85%, transitive from test → 40%, else 0%.
     let mut is_test: BTreeMap<String, bool> = BTreeMap::new();
     for f in files {
-        is_test.insert(f.path.clone(), f.is_test || is_test_path(Path::new(&f.path)));
+        is_test.insert(
+            f.path.clone(),
+            f.is_test || is_test_path(Path::new(&f.path)),
+        );
     }
     for f in &graph.files {
-        is_test.entry(f.clone()).or_insert_with(|| is_test_path(Path::new(f)));
+        is_test
+            .entry(f.clone())
+            .or_insert_with(|| is_test_path(Path::new(f)));
     }
 
     let adj = crate::graph::adjacency(graph);
@@ -592,7 +675,10 @@ fn static_coverage_estimates(
     }
 
     let mut transitive: BTreeMap<String, bool> = BTreeMap::new();
-    let mut seen = direct.keys().cloned().collect::<std::collections::BTreeSet<_>>();
+    let mut seen = direct
+        .keys()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
     while let Some(node) = queue.pop_front() {
         if let Some(nexts) = adj.get(&node) {
             for n in nexts {
@@ -686,10 +772,11 @@ fn compute_hotspots(
 
     let mut hotspots = Vec::new();
     for score in scores {
-        let (commits, w, trend) = weighted
-            .get(&score.path)
-            .copied()
-            .unwrap_or((0, 0.0, ChurnTrend::Stable));
+        let (commits, w, trend) =
+            weighted
+                .get(&score.path)
+                .copied()
+                .unwrap_or((0, 0.0, ChurnTrend::Stable));
         if commits < opts.min_commits && w == 0.0 {
             continue;
         }
@@ -721,11 +808,17 @@ fn compute_targets(
     scores: &[FileScore],
     hotspots: &[Hotspot],
     functions: &[(String, FunctionMetrics)],
+    opts: &HealthOptions,
+    graph: &RequireGraph,
 ) -> Vec<RefactorTarget> {
     let hotspot_map: BTreeMap<_, _> = hotspots.iter().map(|h| (h.path.clone(), h)).collect();
     let fan_ins: Vec<usize> = scores.iter().map(|s| s.fan_in).collect();
     let p25 = percentile(&fan_ins, 0.25).max(2);
     let p95 = percentile(&fan_ins, 0.95).max(5);
+    let p75 = percentile(&fan_ins, 0.75).max(3);
+    let fan_outs: Vec<_> = scores.iter().map(|s| s.fan_out).collect();
+    let out_p95 = percentile(&fan_outs, 0.95).max(8);
+    let out_p90 = percentile(&fan_outs, 0.90).max(5);
 
     let mut by_path: BTreeMap<String, Vec<&FunctionMetrics>> = BTreeMap::new();
     for (path, f) in functions {
@@ -746,12 +839,28 @@ fn compute_targets(
         let priority = (score.complexity_density.min(1.0) * 30.0)
             + (hotspot_boost * 25.0)
             + (score.dead_code_ratio * 20.0)
-            + ((score.fan_in as f64 / 20.0).min(1.0) * 15.0)
-            + ((score.fan_out as f64 / 30.0).min(1.0) * 10.0);
+            + ((score.fan_in as f64 / p95 as f64).min(1.0) * 15.0)
+            + ((score.fan_out as f64 / out_p95 as f64).min(1.0) * 10.0);
 
-        let fns = by_path.get(&score.path).map(|v| v.as_slice()).unwrap_or(&[]);
+        let fns = by_path
+            .get(&score.path)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
         let top_cognitive = fns.iter().map(|f| f.cognitive).max().unwrap_or(0);
         let fn_count = score.function_count;
+        let cycle = opts.cycle_paths.iter().find(|c| c.contains(&score.path));
+        let cycle_target = || {
+            (
+                TargetCategory::CircularDep,
+                "Break the require cycle before changing shared behavior".into(),
+                vec![TargetFactor {
+                    metric: "circular-dependency".into(),
+                    value: 1.0,
+                    threshold: 1.0,
+                    detail: cycle.map(|c| c.join(" -> ")).unwrap_or_default(),
+                }],
+            )
+        };
 
         let effort = if score.lines < 100 && fn_count <= 3 && score.fan_in < p25 {
             Effort::Low
@@ -780,8 +889,10 @@ fn compute_targets(
                     detail: format!("hotspot {hotspot_score:.1} with accelerating trend"),
                 }],
             ))
+        } else if cycle.is_some() && score.fan_in >= 5 {
+            Some(cycle_target())
         } else if score.complexity_density > 0.3
-            && (score.fan_in >= 20 || (score.fan_in >= 10 && fn_count >= 5))
+            && (score.fan_in >= p95 || (score.fan_in >= p75 && fn_count >= 5))
         {
             Some((
                 TargetCategory::HighImpact,
@@ -792,11 +903,13 @@ fn compute_targets(
                 vec![TargetFactor {
                     metric: "fan_in".into(),
                     value: score.fan_in as f64,
-                    threshold: 10.0,
+                    threshold: p95 as f64,
                     detail: format!("{} files depend on this", score.fan_in),
                 }],
             ))
-        } else if score.dead_code_ratio >= 0.5 {
+        } else if score.dead_code_ratio >= 0.5
+            && opts.export_counts.get(&score.path).copied().unwrap_or(0) >= 3
+        {
             Some((
                 TargetCategory::RemoveDeadCode,
                 format!(
@@ -829,17 +942,33 @@ fn compute_targets(
                     detail: format!("{} cognitive {}", top.0, top.1),
                 }],
             ))
-        } else if score.fan_out >= 15 && score.maintainability_index < 60.0 {
+        } else if score.fan_out >= out_p90
+            && score.maintainability_index < 60.0
+            && !opts.entry_points.contains(&score.path)
+        {
             Some((
                 TargetCategory::Coupling,
                 "Reduce coupling: too many requires reduce testability".into(),
                 vec![TargetFactor {
                     metric: "fan_out".into(),
                     value: score.fan_out as f64,
-                    threshold: 15.0,
+                    threshold: out_p90 as f64,
                     detail: format!("fan-out {}", score.fan_out),
                 }],
             ))
+        } else if score.crap_above_threshold >= 2 && score.complexity_density > 0.3 {
+            Some((
+                TargetCategory::AddTestCoverage,
+                "Add tests for the complex functions without a direct test dependency".into(),
+                vec![TargetFactor {
+                    metric: "crap_above_threshold".into(),
+                    value: score.crap_above_threshold as f64,
+                    threshold: 2.0,
+                    detail: "Static test-reachability estimate, not measured coverage".into(),
+                }],
+            ))
+        } else if cycle.is_some() {
+            Some(cycle_target())
         } else {
             None
         };
@@ -848,6 +977,16 @@ fn compute_targets(
             targets.push(RefactorTarget {
                 path: score.path.clone(),
                 priority: round2(priority),
+                efficiency: round2(priority / match effort { Effort::Low => 1.0, Effort::Medium => 2.0, Effort::High => 3.0 }),
+                confidence: match category { TargetCategory::UrgentChurnComplexity => "low", TargetCategory::HighImpact | TargetCategory::Coupling => "medium", _ => "high" }.into(),
+                evidence: serde_json::json!({
+                    "functions": fns.iter().map(|f| serde_json::json!({"name": f.name, "line": f.line, "cognitive": f.cognitive})).collect::<Vec<_>>(),
+                    "unused_exports": opts.unused_export_names.get(&score.path).cloned().unwrap_or_default(),
+                    "clone_siblings": opts.clone_siblings.get(&score.path).cloned().unwrap_or_default(),
+                    "cycle_path": cycle,
+                    "direct_callers": graph.edges.iter().filter(|e| e.to.as_deref() == Some(&score.path)).map(|e| &e.from).collect::<std::collections::BTreeSet<_>>(),
+                    "unresolved_imports": graph.unresolved.len(),
+                }),
                 recommendation,
                 category,
                 effort,
@@ -857,8 +996,8 @@ fn compute_targets(
     }
 
     targets.sort_by(|a, b| {
-        b.priority
-            .partial_cmp(&a.priority)
+        b.efficiency
+            .partial_cmp(&a.efficiency)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| a.path.cmp(&b.path))
     });
@@ -947,7 +1086,7 @@ mod tests {
     fn mi_formula() {
         // density 0.75, dead 1.0, fan_out 0 → penalty 0
         // 100 - 22.5 - 20 - 0 = 57.5
-        let mi = maintainability_index(0.75, 1.0, 0);
+        let mi = maintainability_index_for_lines(0.75, 1.0, 0, 50);
         assert!((mi - 57.5).abs() < 0.01, "mi={mi}");
     }
 

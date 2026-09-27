@@ -2,6 +2,16 @@ use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
+/// Discovery for analysis commands: validate config and apply project ignore globs.
+pub fn discover_configured_files(root: &Path) -> Result<Vec<PathBuf>, String> {
+    let config = crate::config::load_config(root)?.config;
+    let ignored = crate::config::path_patterns(&config.ignore)?;
+    Ok(discover_files(root)
+        .into_iter()
+        .filter(|file| !ignored.is_match(crate::graph::display_rel(root, file)))
+        .collect())
+}
+
 /// Return true when `path` looks like Luau/Lua source.
 pub fn is_luau_source(path: &Path) -> bool {
     match path.extension().and_then(|e| e.to_str()) {

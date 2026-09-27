@@ -1,0 +1,19 @@
+Running BrickBlast shared/game test suites via Lune...
+
+  PASS  AchievementsTests (12 tests)
+  PASS  CosmeticProgressionTests (3 tests)
+  PASS  DeveloperToolsTests (10 tests)
+  PASS  GameplayRulesTests (9 tests)
+  PASS  HandGeneratorTests (21 tests)
+  PASS  ProfilePersistenceTests (21 tests)
+  PASS  SimulationHarnessTests (7 tests)
+  PASS  SoloLayoutTests (20 tests)
+  PASS  StageProgressionTests (11 tests)
+  PASS  TelemetryTests (17 tests)
+  PASS  StageVisualsTests (12 tests)
+  PASS  VisualTokensTests (31 tests)
+  FAIL  UIControlRulesTests
+        C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round3\replay-brickblast-control\src\shared\game\UIControlRulesTests:158: A fractional X coordinate cannot identify a board cell
+  PASS  VisualQualityTests (6 tests)
+
+13/14 modules passed, 180 individual tests ran

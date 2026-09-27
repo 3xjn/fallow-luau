@@ -89,7 +89,7 @@ fallow-luau schema
 
 `--explain` puts metric definitions in a `_meta` object on the JSON so you (or an agent) do not need a second lookup.
 
-Right now the 1:1 Luau surface is in place: parse, require graph, health (incl. score/baselines), dead-code, dupes, audit, explain, inspect, trace, watch, init/config, suppressions, report, flags, viz, and MCP. See [`docs/parity.md`](docs/parity.md). Scoring notes in [`docs/health.md`](docs/health.md).
+The command surface is implemented but experimental; full Fallow parity and general agent productivity gains are not established. Paired reviews produced 9 validated defect repairs with the tool versus 7 without, with mixed results across projects; this small experiment does not establish causality or a refactoring benefit. Use metrics to navigate code, then verify findings with source and tests. See [`docs/parity.md`](docs/parity.md) for limitations, [`docs/health.md`](docs/health.md) for scoring, and the [agent-value comparison](evaluation/results/comparison.md) for protocols and independent replay evidence.
 
 ## Publishing notes (maintainers)
 

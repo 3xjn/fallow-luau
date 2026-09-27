@@ -11,11 +11,10 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-use full_moon::ast::{
-    Call, Expression, Field, FunctionArgs, Prefix, Stmt, Suffix, Var,
-};
+use full_moon::ast::{Call, Expression, Field, FunctionArgs, Prefix, Stmt, Suffix, Var};
 use full_moon::node::Node;
 use full_moon::parse;
+use full_moon::visitors::Visitor;
 use serde::Serialize;
 
 use crate::discover::is_test_path;
@@ -39,6 +38,7 @@ pub enum DeadKind {
     UnusedLocal,
     UnusedType,
     CircularDependency,
+    BoundaryViolation,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -55,7 +55,11 @@ pub struct DeadCodeReport {
     pub unused_exports: Vec<DeadCodeFinding>,
     pub unused_locals: Vec<DeadCodeFinding>,
     pub unused_types: Vec<DeadCodeFinding>,
+    pub total_exports: usize,
+    pub export_count_by_file: BTreeMap<String, usize>,
+    pub exports_by_file: BTreeMap<String, Vec<String>>,
     pub cycles: Vec<CycleInfo>,
+    pub boundary_violations: Vec<DeadCodeFinding>,
     pub findings: Vec<DeadCodeFinding>,
     /// path → dead_code_ratio (unused returned keys / total returned keys)
     pub dead_ratio_by_file: BTreeMap<String, f64>,
@@ -76,10 +80,21 @@ pub fn analyze_dead_code(
     graph: &RequireGraph,
     opts: &DeadCodeOptions,
 ) -> Result<DeadCodeReport, String> {
-    let root = root
-        .canonicalize()
-        .unwrap_or_else(|_| root.to_path_buf());
-    let entries = detect_entry_points(&root, files, graph, &opts.extra_entries);
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let config = crate::config::load_config(&root)?.config;
+    let mut entry_patterns = config.entry;
+    entry_patterns.extend(opts.extra_entries.clone());
+    let matcher = crate::config::path_patterns(&entry_patterns)?;
+    let matched: Vec<_> = graph
+        .files
+        .iter()
+        .filter(|f| matcher.is_match(f))
+        .cloned()
+        .collect();
+    if !entry_patterns.is_empty() && matched.is_empty() {
+        return Err("entry patterns did not match any analyzed files".into());
+    }
+    let entries = detect_entry_points(&root, files, graph, &matched);
     let reachable = reachability(graph, &entries);
     let mut unused_files: Vec<String> = graph
         .files
@@ -92,8 +107,8 @@ pub fn analyze_dead_code(
     let mut modules: BTreeMap<String, ModuleInfo> = BTreeMap::new();
     for file in files {
         let rel = display_rel(&root, file);
-        let source = std::fs::read_to_string(file)
-            .map_err(|e| format!("read {}: {e}", file.display()))?;
+        let source =
+            std::fs::read_to_string(file).map_err(|e| format!("read {}: {e}", file.display()))?;
         let ast = parse(&source).map_err(|errs| {
             format!(
                 "parse {}: {}",
@@ -120,9 +135,8 @@ pub fn analyze_dead_code(
         let refs = key_refs.get(path).cloned().unwrap_or_default();
         let mut unused = 0usize;
         for (name, line) in &info.exports {
-            // Entry modules and test files keep public surface unless never self-used
-            // and never referenced — still report if zero refs from anywhere.
-            if !refs.contains(name) {
+            // An entry module's public API may be used outside this project.
+            if !entries.contains(path) && !refs.contains(name) && !refs.contains("*") {
                 unused += 1;
                 unused_exports.push(DeadCodeFinding {
                     path: path.clone(),
@@ -133,10 +147,7 @@ pub fn analyze_dead_code(
                 });
             }
         }
-        dead_ratio_by_file.insert(
-            path.clone(),
-            unused as f64 / info.exports.len() as f64,
-        );
+        dead_ratio_by_file.insert(path.clone(), unused as f64 / info.exports.len() as f64);
     }
     unused_exports.sort_by(|a, b| (&a.path, a.line, &a.name).cmp(&(&b.path, b.line, &b.name)));
 
@@ -157,15 +168,7 @@ pub fn analyze_dead_code(
     let mut unused_types = Vec::new();
     for (path, info) in &modules {
         for (name, line) in &info.type_decls {
-            // A type is used if referenced by another type name in the file (excluding itself).
-            let used = info
-                .type_refs
-                .iter()
-                .any(|r| r == name)
-                && info.type_decls.iter().filter(|(n, _)| n == name).count() >= 1;
-            // refs include the declaration identifier; require a second mention OR cross-decl use.
-            let mention_count = info.type_refs.iter().filter(|r| *r == name).count();
-            if mention_count <= 1 {
+            if !info.type_refs.contains(name) {
                 unused_types.push(DeadCodeFinding {
                     path: path.clone(),
                     kind: DeadKind::UnusedType,
@@ -174,12 +177,34 @@ pub fn analyze_dead_code(
                     message: format!("type `{name}` is never referenced"),
                 });
             }
-            let _ = used;
         }
     }
     unused_types.sort_by(|a, b| (&a.path, a.line, &a.name).cmp(&(&b.path, b.line, &b.name)));
 
-    let cycles = find_cycles(graph);
+    let markers = crate::suppressions::load_markers(&root, files)?;
+    let suppressed = |path: &str, line: usize, kind: &str| {
+        crate::suppressions::suppresses(&markers, path, line, kind)
+    };
+    unused_files.retain(|path| !suppressed(path, 1, "unused-file"));
+    unused_exports.retain(|f| !suppressed(&f.path, f.line, "unused-export"));
+    unused_locals.retain(|f| !suppressed(&f.path, f.line, "unused-local"));
+    unused_types.retain(|f| !suppressed(&f.path, f.line, "unused-type"));
+    for (path, ratio) in &mut dead_ratio_by_file {
+        let total = modules[path].exports.len();
+        *ratio = if total == 0 {
+            0.0
+        } else {
+            unused_exports.iter().filter(|f| f.path == *path).count() as f64 / total as f64
+        };
+    }
+    let mut cycles = find_cycles(graph);
+    cycles.retain(|c| {
+        !c.path
+            .iter()
+            .any(|p| suppressed(p, 1, "circular-dependency"))
+    });
+    let mut boundary_violations = crate::boundaries::violations(&config.boundaries, graph)?;
+    boundary_violations.retain(|f| !suppressed(&f.path, f.line, "boundary-violation"));
     let mut findings = Vec::new();
     for f in &unused_files {
         findings.push(DeadCodeFinding {
@@ -193,6 +218,7 @@ pub fn analyze_dead_code(
     findings.extend(unused_exports.clone());
     findings.extend(unused_locals.clone());
     findings.extend(unused_types.clone());
+    findings.extend(boundary_violations.clone());
     for c in &cycles {
         let tip = c.path.first().cloned().unwrap_or_default();
         findings.push(DeadCodeFinding {
@@ -212,7 +238,22 @@ pub fn analyze_dead_code(
         unused_exports,
         unused_locals,
         unused_types,
+        total_exports: modules.values().map(|m| m.exports.len()).sum(),
+        export_count_by_file: modules
+            .iter()
+            .map(|(p, m)| (p.clone(), m.exports.len()))
+            .collect(),
+        exports_by_file: modules
+            .iter()
+            .map(|(p, m)| {
+                (
+                    p.clone(),
+                    m.exports.iter().map(|(n, _)| n.clone()).collect(),
+                )
+            })
+            .collect(),
         cycles,
+        boundary_violations,
         findings,
         dead_ratio_by_file,
         _meta: if opts.explain {
@@ -237,11 +278,12 @@ fn detect_entry_points(
             .and_then(|n| n.to_str())
             .unwrap_or("")
             .to_lowercase();
-        if name == "init.lua"
-            || name == "init.luau"
-            || name == "main.lua"
-            || name == "main.luau"
-            || name.starts_with("main.")
+        if extra.is_empty()
+            && (name == "init.lua"
+                || name == "init.luau"
+                || name == "main.lua"
+                || name == "main.luau"
+                || name.starts_with("main."))
         {
             entries.insert(rel);
         }
@@ -343,7 +385,8 @@ fn collect_types(
     ast: &full_moon::ast::Ast,
 ) -> (Vec<(String, usize)>, std::collections::HashSet<String>) {
     let mut decls = Vec::new();
-    let mut refs = std::collections::HashSet::new();
+    let mut refs = TypeReferences::default();
+    refs.visit_ast(ast);
     for stmt in ast.nodes().stmts() {
         match stmt {
             Stmt::TypeDeclaration(td) => {
@@ -354,39 +397,26 @@ fn collect_types(
                     .map(|p| p.line())
                     .unwrap_or(1);
                 decls.push((name, line));
-                collect_type_refs_from_decl(td, &mut refs);
             }
-            Stmt::ExportedTypeDeclaration(et) => {
-                let td = et.type_declaration();
-                let name = td.type_name().token().to_string();
-                let line = td
-                    .type_name()
-                    .start_position()
-                    .map(|p| p.line())
-                    .unwrap_or(1);
-                decls.push((name, line));
-                collect_type_refs_from_decl(td, &mut refs);
-            }
+            // Exported types can be consumed outside the analyzed project.
+            Stmt::ExportedTypeDeclaration(_) => {}
             _ => {}
         }
     }
-    // Also scan source-ish type assertions via display tokens — type refs inside
-    // declarations already collected; strip self-refs below.
-    (decls, refs)
+    (decls, refs.0)
 }
 
-fn collect_type_refs_from_decl(
-    td: &full_moon::ast::luau::TypeDeclaration,
-    refs: &mut std::collections::HashSet<String>,
-) {
-    // Walk the type info display string for Identifier-like tokens is fragile;
-    // use Node tokens in the type definition subtree.
-    for token in td.tokens() {
-        if let full_moon::tokenizer::TokenType::Identifier { identifier } = token.token_type() {
-            let s = identifier.to_string();
-            // Skip the declared name itself when it appears as the left-hand side —
-            // callers remove self after.
-            refs.insert(s);
+#[derive(Default)]
+struct TypeReferences(HashSet<String>);
+
+impl Visitor for TypeReferences {
+    fn visit_type_info(&mut self, info: &full_moon::ast::luau::TypeInfo) {
+        use full_moon::ast::luau::TypeInfo;
+        match info {
+            TypeInfo::Basic(token) | TypeInfo::Generic { base: token, .. } => {
+                self.0.insert(token.token().to_string());
+            }
+            _ => {}
         }
     }
 }
@@ -438,11 +468,7 @@ fn find_unused_locals(ast: &full_moon::ast::Ast) -> Vec<LocalBinding> {
     walk_block_locals(ast.nodes(), &mut declared, &mut reads, &mut scope);
     declared
         .into_iter()
-        .filter(|(name, _, _)| {
-            name != "_"
-                && !name.starts_with('_')
-                && !reads.contains(name)
-        })
+        .filter(|(name, _, _)| name != "_" && !name.starts_with('_') && !reads.contains(name))
         .map(|(name, line, _)| LocalBinding { name, line })
         .collect()
 }
@@ -455,6 +481,11 @@ fn walk_block_locals(
 ) {
     for stmt in block.stmts() {
         walk_stmt_locals(stmt, declared, reads, scope);
+    }
+    if let Some(full_moon::ast::LastStmt::Return(ret)) = block.last_stmt() {
+        for expr in ret.returns() {
+            walk_expr_reads(expr, reads);
+        }
     }
 }
 
@@ -502,7 +533,12 @@ fn walk_stmt_locals(
             for expr in a.expressions() {
                 walk_expr_reads(expr, reads);
             }
-            // LHS names count as writes, not reads
+            // An indexed write reads the table and any index expression.
+            for var in a.variables() {
+                if matches!(var, Var::Expression(_)) {
+                    walk_var_reads(var, reads);
+                }
+            }
         }
         Stmt::FunctionCall(call) => walk_call_reads(call, reads),
         Stmt::If(i) => {
@@ -543,7 +579,10 @@ fn walk_stmt_locals(
             walk_block_locals(f.block(), declared, reads, scope);
         }
         Stmt::Do(d) => walk_block_locals(d.block(), declared, reads, scope),
-        Stmt::CompoundAssignment(c) => walk_expr_reads(c.rhs(), reads),
+        Stmt::CompoundAssignment(c) => {
+            walk_var_reads(c.lhs(), reads);
+            walk_expr_reads(c.rhs(), reads);
+        }
         _ => {}
     }
 }
@@ -664,263 +703,14 @@ fn collect_key_references(
     files: &[PathBuf],
     graph: &RequireGraph,
 ) -> Result<BTreeMap<String, BTreeSet<String>>, String> {
-    // Map absolute-ish rel path of required module → set of keys referenced
     let mut refs: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for f in &graph.files {
-        refs.entry(f.clone()).or_default();
-    }
-
-    // Build specifier resolution using existing edges
-    let mut from_edges: BTreeMap<(String, String), String> = BTreeMap::new();
-    for e in &graph.edges {
-        if let (Some(spec), Some(to)) = (&e.specifier, &e.to) {
-            from_edges.insert((e.from.clone(), spec.clone()), to.clone());
-        }
-    }
-
-    for file in files {
-        let from_rel = display_rel(root, file);
-        let source = std::fs::read_to_string(file)
-            .map_err(|e| format!("read {}: {e}", file.display()))?;
-        let ast = parse(&source).map_err(|e| format!("parse {}: {e:?}", file.display()))?;
-
-        // Bindings: local name → required module rel path
-        let mut bindings: HashMap<String, String> = HashMap::new();
-        scan_requires_and_refs(ast.nodes(), &from_rel, &from_edges, &mut bindings, &mut refs);
-        if let Some(full_moon::ast::LastStmt::Return(r)) = ast.nodes().last_stmt() {
-            for expr in r.returns() {
-                scan_expr_refs(expr, &from_rel, &from_edges, &bindings, &mut refs);
-            }
-        }
+    for reference in crate::references::collect(root, files, graph)? {
+        refs.entry(reference.to)
+            .or_default()
+            .insert(reference.key.unwrap_or_else(|| "*".into()));
     }
     Ok(refs)
 }
-
-fn scan_requires_and_refs(
-    block: &full_moon::ast::Block,
-    from_rel: &str,
-    edges: &BTreeMap<(String, String), String>,
-    bindings: &mut HashMap<String, String>,
-    refs: &mut BTreeMap<String, BTreeSet<String>>,
-) {
-    for stmt in block.stmts() {
-        match stmt {
-            Stmt::LocalAssignment(a) => {
-                let names: Vec<_> = a.names().iter().map(|n| n.token().to_string()).collect();
-                let exprs: Vec<_> = a.expressions().iter().collect();
-                for (i, name) in names.iter().enumerate() {
-                    if let Some(expr) = exprs.get(i) {
-                        if let Some(mod_path) = require_target(expr, from_rel, edges) {
-                            bindings.insert(name.clone(), mod_path);
-                        }
-                        scan_expr_refs(expr, from_rel, edges, bindings, refs);
-                    }
-                }
-            }
-            Stmt::Assignment(a) => {
-                for expr in a.expressions() {
-                    scan_expr_refs(expr, from_rel, edges, bindings, refs);
-                }
-            }
-            Stmt::FunctionCall(c) => scan_call_refs(c, from_rel, edges, bindings, refs),
-            Stmt::If(i) => {
-                scan_expr_refs(i.condition(), from_rel, edges, bindings, refs);
-                scan_requires_and_refs(i.block(), from_rel, edges, bindings, refs);
-                for e in i.else_if().into_iter().flatten() {
-                    scan_expr_refs(e.condition(), from_rel, edges, bindings, refs);
-                    scan_requires_and_refs(e.block(), from_rel, edges, bindings, refs);
-                }
-                if let Some(b) = i.else_block() {
-                    scan_requires_and_refs(b, from_rel, edges, bindings, refs);
-                }
-            }
-            Stmt::While(w) => {
-                scan_expr_refs(w.condition(), from_rel, edges, bindings, refs);
-                scan_requires_and_refs(w.block(), from_rel, edges, bindings, refs);
-            }
-            Stmt::Do(d) => scan_requires_and_refs(d.block(), from_rel, edges, bindings, refs),
-            Stmt::LocalFunction(f) => {
-                scan_requires_and_refs(f.body().block(), from_rel, edges, bindings, refs)
-            }
-            Stmt::FunctionDeclaration(f) => {
-                scan_requires_and_refs(f.body().block(), from_rel, edges, bindings, refs)
-            }
-            Stmt::NumericFor(f) => {
-                scan_requires_and_refs(f.block(), from_rel, edges, bindings, refs)
-            }
-            Stmt::GenericFor(f) => {
-                for e in f.expressions() {
-                    scan_expr_refs(e, from_rel, edges, bindings, refs);
-                }
-                scan_requires_and_refs(f.block(), from_rel, edges, bindings, refs);
-            }
-            Stmt::Repeat(r) => {
-                scan_requires_and_refs(r.block(), from_rel, edges, bindings, refs);
-                scan_expr_refs(r.until(), from_rel, edges, bindings, refs);
-            }
-            _ => {}
-        }
-    }
-}
-
-fn require_target(
-    expr: &Expression,
-    from_rel: &str,
-    edges: &BTreeMap<(String, String), String>,
-) -> Option<String> {
-    let Expression::FunctionCall(call) = expr else {
-        return None;
-    };
-    let Prefix::Name(tok) = call.prefix() else {
-        return None;
-    };
-    if tok.token().to_string().trim() != "require" {
-        return None;
-    }
-    let suffixes: Vec<_> = call.suffixes().collect();
-    let Suffix::Call(Call::AnonymousCall(args)) = suffixes.first()? else {
-        return None;
-    };
-    let FunctionArgs::Parentheses { arguments, .. } = args else {
-        return None;
-    };
-    let first = arguments.iter().next()?;
-    let Expression::String(s) = first else {
-        return None;
-    };
-    let spec = unquote_str(&s.token().to_string());
-    edges
-        .get(&(from_rel.to_string(), spec))
-        .cloned()
-}
-
-fn scan_expr_refs(
-    expr: &Expression,
-    from_rel: &str,
-    edges: &BTreeMap<(String, String), String>,
-    bindings: &HashMap<String, String>,
-    refs: &mut BTreeMap<String, BTreeSet<String>>,
-) {
-    match expr {
-        Expression::Var(Var::Expression(ve)) => {
-            // m.key or require("x").key
-            if let Prefix::Name(tok) = ve.prefix() {
-                let base = tok.token().to_string();
-                if let Some(mod_path) = bindings.get(&base) {
-                    for s in ve.suffixes() {
-                        if let Suffix::Index(full_moon::ast::Index::Dot { name, .. }) = s {
-                            refs.entry(mod_path.clone())
-                                .or_default()
-                                .insert(name.token().to_string());
-                        }
-                    }
-                }
-            } else if let Prefix::Expression(inner) = ve.prefix() {
-                if let Some(mod_path) = require_target(inner, from_rel, edges) {
-                    for s in ve.suffixes() {
-                        if let Suffix::Index(full_moon::ast::Index::Dot { name, .. }) = s {
-                            refs.entry(mod_path.clone())
-                                .or_default()
-                                .insert(name.token().to_string());
-                        }
-                    }
-                }
-                scan_expr_refs(inner, from_rel, edges, bindings, refs);
-            }
-            for s in ve.suffixes() {
-                if let Suffix::Call(Call::AnonymousCall(args)) = s {
-                    if let FunctionArgs::Parentheses { arguments, .. } = args {
-                        for a in arguments {
-                            scan_expr_refs(a, from_rel, edges, bindings, refs);
-                        }
-                    }
-                }
-            }
-        }
-        Expression::FunctionCall(c) => scan_call_refs(c, from_rel, edges, bindings, refs),
-        Expression::BinaryOperator { lhs, rhs, .. } => {
-            scan_expr_refs(lhs, from_rel, edges, bindings, refs);
-            scan_expr_refs(rhs, from_rel, edges, bindings, refs);
-        }
-        Expression::Parentheses { expression, .. }
-        | Expression::UnaryOperator { expression, .. }
-        | Expression::TypeAssertion { expression, .. } => {
-            scan_expr_refs(expression, from_rel, edges, bindings, refs)
-        }
-        Expression::TableConstructor(t) => {
-            for f in t.fields() {
-                match f {
-                    Field::ExpressionKey { key, value, .. } => {
-                        scan_expr_refs(key, from_rel, edges, bindings, refs);
-                        scan_expr_refs(value, from_rel, edges, bindings, refs);
-                    }
-                    Field::NameKey { value, .. } => {
-                        scan_expr_refs(value, from_rel, edges, bindings, refs)
-                    }
-                    Field::NoKey(v) => scan_expr_refs(v, from_rel, edges, bindings, refs),
-                    _ => {}
-                }
-            }
-        }
-        Expression::Function(anon) => {
-            scan_requires_and_refs(
-                anon.body().block(),
-                from_rel,
-                edges,
-                &mut bindings.clone(),
-                refs,
-            );
-        }
-        _ => {}
-    }
-}
-
-fn scan_call_refs(
-    call: &full_moon::ast::FunctionCall,
-    from_rel: &str,
-    edges: &BTreeMap<(String, String), String>,
-    bindings: &HashMap<String, String>,
-    refs: &mut BTreeMap<String, BTreeSet<String>>,
-) {
-    if let Prefix::Expression(e) = call.prefix() {
-        scan_expr_refs(e, from_rel, edges, bindings, refs);
-    } else if let Prefix::Name(tok) = call.prefix() {
-        let base = tok.token().to_string();
-        // m.foo(...) — method-ish via dot then call is Suffix chain
-        if let Some(mod_path) = bindings.get(&base) {
-            let suffixes: Vec<_> = call.suffixes().collect();
-            if let Some(Suffix::Index(full_moon::ast::Index::Dot { name, .. })) = suffixes.first()
-            {
-                refs.entry(mod_path.clone())
-                    .or_default()
-                    .insert(name.token().to_string());
-            }
-        }
-    }
-    for s in call.suffixes() {
-        match s {
-            Suffix::Call(Call::AnonymousCall(args)) => {
-                if let FunctionArgs::Parentheses { arguments, .. } = args {
-                    for a in arguments {
-                        scan_expr_refs(a, from_rel, edges, bindings, refs);
-                    }
-                }
-            }
-            Suffix::Call(Call::MethodCall(m)) => {
-                if let FunctionArgs::Parentheses { arguments, .. } = m.args() {
-                    for a in arguments {
-                        scan_expr_refs(a, from_rel, edges, bindings, refs);
-                    }
-                }
-            }
-            Suffix::Index(full_moon::ast::Index::Brackets { expression, .. }) => {
-                scan_expr_refs(expression, from_rel, edges, bindings, refs)
-            }
-            _ => {}
-        }
-    }
-}
-
 /// Tarjan SCC for require cycles.
 pub fn find_cycles(graph: &RequireGraph) -> Vec<CycleInfo> {
     let adj = adjacency(graph);
@@ -973,11 +763,39 @@ pub fn find_cycles(graph: &RequireGraph) -> Vec<CycleInfo> {
                 }
             }
             if comp.len() > 1 {
-                comp.reverse();
-                // close the cycle for display
-                let first = comp[0].clone();
-                comp.push(first);
-                cycles.push(CycleInfo { path: comp });
+                // SCC order need not follow real edges. Build a closed walk
+                // through its members so every displayed step is actionable.
+                comp.sort();
+                let members: BTreeSet<_> = comp.iter().cloned().collect();
+                let mut path = vec![comp[0].clone()];
+                for to in comp.iter().skip(1).chain(std::iter::once(&comp[0])) {
+                    let from = path.last().unwrap().clone();
+                    let mut queue = VecDeque::from([from.clone()]);
+                    let mut previous = BTreeMap::from([(from.clone(), None::<String>)]);
+                    while let Some(node) = queue.pop_front() {
+                        if node == *to {
+                            break;
+                        }
+                        for next in adj.get(&node).into_iter().flatten() {
+                            if members.contains(next) && !previous.contains_key(next) {
+                                previous.insert(next.clone(), Some(node.clone()));
+                                queue.push_back(next.clone());
+                            }
+                        }
+                    }
+                    let mut segment = vec![to.clone()];
+                    let mut cursor = to;
+                    while let Some(Some(parent)) = previous.get(cursor) {
+                        if parent == &from {
+                            break;
+                        }
+                        segment.push(parent.clone());
+                        cursor = parent;
+                    }
+                    segment.reverse();
+                    path.extend(segment);
+                }
+                cycles.push(CycleInfo { path });
             } else if comp.len() == 1 {
                 // self-loop
                 if adj

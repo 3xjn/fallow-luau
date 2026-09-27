@@ -1,0 +1,15 @@
+local signals = require("./src")
+local getValue, setValue = signals.signal(0)
+local runs = 0
+local created, creationError = pcall(function()
+    signals.effect(function()
+        getValue()
+        runs += 1
+        error("initial effect failed")
+    end)
+end)
+local updated = pcall(function() setValue(1) end)
+print("creation_succeeded", created)
+print("original_error_preserved", string.find(tostring(creationError), "initial effect failed", 1, true) ~= nil)
+print("setter_succeeded", updated)
+print("callback_runs", runs)

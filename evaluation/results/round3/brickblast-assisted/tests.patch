@@ -1,0 +1,111 @@
+diff --git a/src/shared/game/ProfilePersistenceTests.luau b/src/shared/game/ProfilePersistenceTests.luau
+index 41188e2..e422d5b 100644
+--- a/src/shared/game/ProfilePersistenceTests.luau
++++ b/src/shared/game/ProfilePersistenceTests.luau
+@@ -227,11 +227,13 @@ end
+ 
+ tests.reconcileKeepsStoredReceiptsAndCodes = function()
+ 	local payload = {
++		version = ProfilePersistence.Version,
+ 		coins = 500,
+ 		fulfilledPurchaseIds = {},
+ 		redeemedCodes = {},
+ 	}
+ 	local stored = {
++		version = ProfilePersistence.Version,
+ 		coins = 900,
+ 		fulfilledPurchaseIds = { receipt1 = true },
+ 		redeemedCodes = { launch = true },
+@@ -241,6 +243,39 @@ tests.reconcileKeepsStoredReceiptsAndCodes = function()
+ 	assertCondition(reconciled.fulfilledPurchaseIds.receipt1 == true, "Stored receipts survive")
+ 	assertCondition(reconciled.redeemedCodes.launch == true, "Stored redeemed codes survive")
+ 	assertCondition(reconciled.coins == 500, "Session stats still come from the payload")
++	assertCondition(
++		reconciled.version == ProfilePersistence.Version,
++		"Same-version merge keeps the schema"
++	)
++end
++
++tests.reconcileRefusesAConcurrentFutureProfile = function()
++	local payload = {
++		version = ProfilePersistence.Version,
++		coins = 10,
++		fulfilledPurchaseIds = {},
++		redeemedCodes = {},
++	}
++	local stored = {
++		version = ProfilePersistence.Version + 1,
++		coins = 20,
++		futureField = "keep",
++		fulfilledPurchaseIds = { futureReceipt = true },
++		redeemedCodes = {},
++	}
++
++	local ok = pcall(ProfilePersistence.reconcileWithStored, payload, stored)
++	assertCondition(not ok, "UpdateAsync must abort rather than overwrite a future profile")
++	assertCondition(
++		stored.version == ProfilePersistence.Version + 1,
++		"Future version stays untouched"
++	)
++	assertCondition(stored.futureField == "keep", "Future-only data stays untouched")
++	assertCondition(
++		stored.fulfilledPurchaseIds.futureReceipt == true,
++		"Stored receipt stays untouched"
++	)
++	assertCondition(payload.coins == 10, "Rejected reconciliation leaves the payload untouched")
+ end
+ 
+ tests.reconcileHandlesAMissingStoredProfile = function()
+diff --git a/src/shared/game/UIControlRulesTests.luau b/src/shared/game/UIControlRulesTests.luau
+index deb1407..4a373c1 100644
+--- a/src/shared/game/UIControlRulesTests.luau
++++ b/src/shared/game/UIControlRulesTests.luau
+@@ -65,6 +65,24 @@ tests.resetAndReturnDebounce = function()
+ 	)
+ end
+ 
++tests.cooldownAcceptsFirstRequestThenEnforcesWindow = function()
++	local timestamps = {}
++	assertCondition(
++		UIControlRules.consumeActionCooldown(timestamps, "play", 0.45, 0.1),
++		"A key without a prior request should be accepted immediately"
++	)
++	assertCondition(timestamps.play == 0.1, "Accepted request records its timestamp")
++	assertCondition(
++		not UIControlRules.consumeActionCooldown(timestamps, "play", 0.45, 0.2),
++		"A repeat inside the cooldown should be rejected"
++	)
++	assertCondition(timestamps.play == 0.1, "A rejected repeat must not extend the cooldown")
++	assertCondition(
++		UIControlRules.consumeActionCooldown(timestamps, "play", 0.45, 0.7),
++		"A request after the cooldown should be accepted"
++	)
++end
++
+ local function boardGridChildren()
+ 	local children = { { className = "UIPadding" }, { className = "UIGridLayout" } }
+ 
+@@ -152,6 +170,23 @@ tests.boardGridRejectsBadCoordinates = function()
+ 	)
+ end
+ 
++tests.boardGridRejectsNonintegerCoordinates = function()
++	for _, badCoordinate in { 1.5, 0 / 0, math.huge } do
++		local children = boardGridChildren()
++		children[3].boardX = badCoordinate
++		assertCondition(
++			not UIControlRules.validateBoardGridChildren(children),
++			"A board cell needs a finite integer x coordinate"
++		)
++		children = boardGridChildren()
++		children[3].boardY = badCoordinate
++		assertCondition(
++			not UIControlRules.validateBoardGridChildren(children),
++			"A board cell needs a finite integer y coordinate"
++		)
++	end
++end
++
+ tests.touchDrivesThePlacementPipelineAlongsideTheMouse = function()
+ 	-- The regression this guards: every stage of the drag pipeline was gated
+ 	-- on a mouse input type, so touch never armed a drag, never moved one, and

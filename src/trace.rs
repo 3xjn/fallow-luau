@@ -5,10 +5,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::discover::discover_files;
-use crate::graph::{adjacency, build_require_graph, display_rel};
-use crate::dead_code::analyze_dead_code;
-use crate::dead_code::DeadCodeOptions;
+use crate::discover::discover_configured_files;
+use crate::graph::{adjacency, build_require_graph};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TraceEdge {
@@ -16,6 +14,8 @@ pub struct TraceEdge {
     pub to: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -30,6 +30,7 @@ pub struct TraceReport {
     pub callees: Vec<TraceEdge>,
     pub caller_files: Vec<String>,
     pub callee_files: Vec<String>,
+    pub scope: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub _meta: Option<serde_json::Value>,
 }
@@ -44,18 +45,12 @@ pub fn trace_symbol(
     let root = root
         .canonicalize()
         .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
-    let files = discover_files(&root);
+    let files = discover_configured_files(&root)?;
     let graph = build_require_graph(&root, &files)?;
-    let rel = path.replace('\\', "/");
-    if !graph.files.iter().any(|f| f == &rel) {
-        // try resolve
-        let abs = root.join(&rel);
-        let rel = if abs.exists() {
-            display_rel(&root, &abs)
-        } else {
-            return Err(format!("unknown file `{path}`"));
-        };
-        return trace_symbol(&root, &rel, key, depth, explain);
+    let rel = crate::inspect::normalize_target(&root, path, &graph.files)?;
+    let references = crate::references::collect(&root, &files, &graph)?;
+    if let Some(key) = key {
+        crate::inspect::inspect_target(&root, &rel, Some(key), false)?;
     }
 
     let adj = adjacency(&graph);
@@ -66,7 +61,6 @@ pub fn trace_symbol(
         }
     }
 
-    let depth = depth.max(1);
     let mut callers = Vec::new();
     let mut caller_files = BTreeSet::new();
     {
@@ -79,11 +73,30 @@ pub fn trace_symbol(
             }
             if let Some(preds) = reverse.get(&node) {
                 for p in preds {
-                    callers.push(TraceEdge {
-                        from: p.clone(),
-                        to: node.clone(),
-                        key: key.map(|k| k.to_string()),
-                    });
+                    if d == 0 && key.is_some() {
+                        let hits: Vec<_> = references
+                            .iter()
+                            .filter(|r| r.from == *p && r.to == node && r.key.as_deref() == key)
+                            .collect();
+                        if hits.is_empty() {
+                            continue;
+                        }
+                        for hit in hits {
+                            callers.push(TraceEdge {
+                                from: p.clone(),
+                                to: node.clone(),
+                                key: hit.key.clone(),
+                                line: Some(hit.line),
+                            });
+                        }
+                    } else {
+                        callers.push(TraceEdge {
+                            from: p.clone(),
+                            to: node.clone(),
+                            key: None,
+                            line: None,
+                        });
+                    }
                     caller_files.insert(p.clone());
                     if seen.insert(p.clone()) {
                         q.push_back((p.clone(), d + 1));
@@ -109,6 +122,7 @@ pub fn trace_symbol(
                         from: node.clone(),
                         to: n.clone(),
                         key: None,
+                        line: None,
                     });
                     callee_files.insert(n.clone());
                     if seen.insert(n.clone()) {
@@ -118,17 +132,6 @@ pub fn trace_symbol(
             }
         }
     }
-
-    // If a key is named, note whether dead-code thinks it's unused.
-    let _ = analyze_dead_code(
-        &root,
-        &files,
-        &graph,
-        &DeadCodeOptions {
-            explain: false,
-            ..Default::default()
-        },
-    );
 
     Ok(TraceReport {
         schema_version: 1,
@@ -140,10 +143,11 @@ pub fn trace_symbol(
         callees,
         caller_files: caller_files.into_iter().collect(),
         callee_files: callee_files.into_iter().collect(),
+        scope: "Direct callers are literal imported-key references when a key is supplied; transitive callers and all callees are module dependencies. Dynamic references and same-module calls are not resolved.".into(),
         _meta: if explain {
             Some(serde_json::json!({
                 "docs": "https://docs.fallow.tools/cli/trace",
-                "note": "Bounded require-graph walk. Key filtering is advisory; edges are module-level."
+                "note": "Keyed direct callers include observed source lines; other edges are module-level."
             }))
         } else {
             None

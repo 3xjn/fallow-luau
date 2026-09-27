@@ -1,0 +1,645 @@
+{
+  "schema_version": 1,
+  "root": "\\\\?\\C:\\Users\\asher\\Documents\\ChatGPT\\fallow-luau\\target\\evaluation\\upstream\\brickblast-roblox\\src\\shared\\game",
+  "files_analyzed": 31,
+  "findings": [
+    {
+      "path": "HandGenerator.luau",
+      "name": "HandGenerator.generate",
+      "line": 459,
+      "lines": 135,
+      "cyclomatic": 30,
+      "cognitive": 46,
+      "rule": "fallow-luau/high-complexity"
+    },
+    {
+      "path": "DeveloperTools.luau",
+      "name": "DeveloperTools.applyCommand",
+      "line": 230,
+      "lines": 102,
+      "cyclomatic": 26,
+      "cognitive": 32,
+      "rule": "fallow-luau/high-complexity"
+    },
+    {
+      "path": "UIControlRules.luau",
+      "name": "UIControlRules.validateBoardGridChildren",
+      "line": 228,
+      "lines": 49,
+      "cyclomatic": 21,
+      "cognitive": 28,
+      "rule": "fallow-luau/high-complexity"
+    },
+    {
+      "path": "DeveloperTools.luau",
+      "name": "DeveloperTools.diagnostics",
+      "line": 191,
+      "lines": 32,
+      "cyclomatic": 20,
+      "cognitive": 19,
+      "rule": "fallow-luau/high-complexity"
+    },
+    {
+      "path": "HandGenerator.luau",
+      "name": "HandGenerator.scoreShapeIds",
+      "line": 380,
+      "lines": 57,
+      "cyclomatic": 16,
+      "cognitive": 22,
+      "rule": "fallow-luau/high-cognitive-complexity"
+    },
+    {
+      "path": "Grid.luau",
+      "name": "Grid.clearLines",
+      "line": 62,
+      "lines": 44,
+      "cyclomatic": 13,
+      "cognitive": 22,
+      "rule": "fallow-luau/high-cognitive-complexity"
+    },
+    {
+      "path": "DeveloperTools.luau",
+      "name": "DeveloperTools.boardPattern",
+      "line": 138,
+      "lines": 32,
+      "cyclomatic": 11,
+      "cognitive": 18,
+      "rule": "fallow-luau/high-cognitive-complexity"
+    },
+    {
+      "path": "DeveloperTools.luau",
+      "name": "legalPlacementCounts",
+      "line": 63,
+      "lines": 27,
+      "cyclomatic": 10,
+      "cognitive": 19,
+      "rule": "fallow-luau/high-cognitive-complexity"
+    },
+    {
+      "path": "Telemetry.luau",
+      "name": "Telemetry.mergeErrorLog",
+      "line": 131,
+      "lines": 31,
+      "cyclomatic": 10,
+      "cognitive": 15,
+      "rule": "fallow-luau/high-cognitive-complexity"
+    },
+    {
+      "path": "Grid.luau",
+      "name": "Grid.hasAnyMove",
+      "line": 107,
+      "lines": 15,
+      "cyclomatic": 6,
+      "cognitive": 15,
+      "rule": "fallow-luau/high-cognitive-complexity"
+    }
+  ],
+  "file_scores": [
+    {
+      "path": "HandGenerator.luau",
+      "maintainability_index": 93.09,
+      "complexity_density": 0.2303,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 595,
+      "function_count": 27,
+      "total_cyclomatic": 137,
+      "total_cognitive": 157,
+      "crap_max": 930.0,
+      "crap_above_threshold": 7
+    },
+    {
+      "path": "DeveloperTools.luau",
+      "maintainability_index": 90.8,
+      "complexity_density": 0.3068,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 352,
+      "function_count": 18,
+      "total_cyclomatic": 108,
+      "total_cognitive": 124,
+      "crap_max": 702.0,
+      "crap_above_threshold": 7
+    },
+    {
+      "path": "UIControlRules.luau",
+      "maintainability_index": 93.09,
+      "complexity_density": 0.2302,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 278,
+      "function_count": 12,
+      "total_cyclomatic": 64,
+      "total_cognitive": 62,
+      "crap_max": 462.0,
+      "crap_above_threshold": 4
+    },
+    {
+      "path": "Grid.luau",
+      "maintainability_index": 90.87,
+      "complexity_density": 0.3043,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 138,
+      "function_count": 7,
+      "total_cyclomatic": 42,
+      "total_cognitive": 63,
+      "crap_max": 182.0,
+      "crap_above_threshold": 4
+    },
+    {
+      "path": "Config.luau",
+      "maintainability_index": 98.38,
+      "complexity_density": 0.0541,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 628,
+      "function_count": 8,
+      "total_cyclomatic": 34,
+      "total_cognitive": 32,
+      "crap_max": 132.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "Telemetry.luau",
+      "maintainability_index": 93.15,
+      "complexity_density": 0.2283,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 184,
+      "function_count": 6,
+      "total_cyclomatic": 42,
+      "total_cognitive": 54,
+      "crap_max": 110.0,
+      "crap_above_threshold": 4
+    },
+    {
+      "path": "StageVisuals.luau",
+      "maintainability_index": 94.28,
+      "complexity_density": 0.1907,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 194,
+      "function_count": 12,
+      "total_cyclomatic": 37,
+      "total_cognitive": 26,
+      "crap_max": 90.0,
+      "crap_above_threshold": 3
+    },
+    {
+      "path": "ProfilePersistence.luau",
+      "maintainability_index": 94.97,
+      "complexity_density": 0.1675,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 197,
+      "function_count": 7,
+      "total_cyclomatic": 33,
+      "total_cognitive": 33,
+      "crap_max": 72.0,
+      "crap_above_threshold": 4
+    },
+    {
+      "path": "SimulationHarness.luau",
+      "maintainability_index": 94.8,
+      "complexity_density": 0.1734,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 271,
+      "function_count": 12,
+      "total_cyclomatic": 47,
+      "total_cognitive": 58,
+      "crap_max": 72.0,
+      "crap_above_threshold": 5
+    },
+    {
+      "path": "VisualQuality.luau",
+      "maintainability_index": 92.6,
+      "complexity_density": 0.2468,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 77,
+      "function_count": 4,
+      "total_cyclomatic": 19,
+      "total_cognitive": 15,
+      "crap_max": 72.0,
+      "crap_above_threshold": 2
+    },
+    {
+      "path": "GameplayRules.luau",
+      "maintainability_index": 92.94,
+      "complexity_density": 0.2353,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 102,
+      "function_count": 6,
+      "total_cyclomatic": 24,
+      "total_cognitive": 18,
+      "crap_max": 56.0,
+      "crap_above_threshold": 3
+    },
+    {
+      "path": "SoloLayout.luau",
+      "maintainability_index": 97.65,
+      "complexity_density": 0.0782,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 358,
+      "function_count": 11,
+      "total_cyclomatic": 28,
+      "total_cognitive": 17,
+      "crap_max": 56.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "SoloLayoutTests.luau",
+      "maintainability_index": 96.75,
+      "complexity_density": 0.1083,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 434,
+      "function_count": 25,
+      "total_cyclomatic": 47,
+      "total_cognitive": 30,
+      "crap_max": 56.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "VisualTokensTests.luau",
+      "maintainability_index": 95.19,
+      "complexity_density": 0.1602,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 462,
+      "function_count": 37,
+      "total_cyclomatic": 74,
+      "total_cognitive": 48,
+      "crap_max": 56.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "Achievements.luau",
+      "maintainability_index": 97.42,
+      "complexity_density": 0.086,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 279,
+      "function_count": 6,
+      "total_cyclomatic": 24,
+      "total_cognitive": 26,
+      "crap_max": 42.0,
+      "crap_above_threshold": 2
+    },
+    {
+      "path": "StageProgression.luau",
+      "maintainability_index": 94.14,
+      "complexity_density": 0.1955,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 133,
+      "function_count": 9,
+      "total_cyclomatic": 26,
+      "total_cognitive": 21,
+      "crap_max": 42.0,
+      "crap_above_threshold": 2
+    },
+    {
+      "path": "GameplayRulesTests.luau",
+      "maintainability_index": 96.7,
+      "complexity_density": 0.1099,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 182,
+      "function_count": 11,
+      "total_cyclomatic": 20,
+      "total_cognitive": 10,
+      "crap_max": 30.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "HandGeneratorTests.luau",
+      "maintainability_index": 96.6,
+      "complexity_density": 0.1133,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 459,
+      "function_count": 27,
+      "total_cyclomatic": 52,
+      "total_cognitive": 36,
+      "crap_max": 30.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "VisualTokens.luau",
+      "maintainability_index": 97.84,
+      "complexity_density": 0.0719,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 445,
+      "function_count": 17,
+      "total_cyclomatic": 32,
+      "total_cognitive": 19,
+      "crap_max": 30.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "Blocks.luau",
+      "maintainability_index": 97.41,
+      "complexity_density": 0.0863,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 313,
+      "function_count": 11,
+      "total_cyclomatic": 27,
+      "total_cognitive": 18,
+      "crap_max": 20.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "StageVisualsTests.luau",
+      "maintainability_index": 95.69,
+      "complexity_density": 0.1436,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 188,
+      "function_count": 14,
+      "total_cyclomatic": 27,
+      "total_cognitive": 18,
+      "crap_max": 20.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "CosmeticProgressionTests.luau",
+      "maintainability_index": 94.18,
+      "complexity_density": 0.1939,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 98,
+      "function_count": 7,
+      "total_cyclomatic": 19,
+      "total_cognitive": 13,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "ExperienceConfig.luau",
+      "maintainability_index": 95.63,
+      "complexity_density": 0.1458,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 48,
+      "function_count": 3,
+      "total_cyclomatic": 7,
+      "total_cognitive": 4,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "SimulationHarnessTests.luau",
+      "maintainability_index": 95.94,
+      "complexity_density": 0.1353,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 133,
+      "function_count": 10,
+      "total_cyclomatic": 18,
+      "total_cognitive": 10,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "StageProgressionTests.luau",
+      "maintainability_index": 97.07,
+      "complexity_density": 0.0978,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 184,
+      "function_count": 14,
+      "total_cyclomatic": 18,
+      "total_cognitive": 5,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "UIControlRulesTests.luau",
+      "maintainability_index": 97.11,
+      "complexity_density": 0.0963,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 270,
+      "function_count": 18,
+      "total_cyclomatic": 26,
+      "total_cognitive": 9,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "AchievementsTests.luau",
+      "maintainability_index": 96.36,
+      "complexity_density": 0.1212,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 165,
+      "function_count": 14,
+      "total_cyclomatic": 20,
+      "total_cognitive": 6,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "DeveloperToolsTests.luau",
+      "maintainability_index": 97.42,
+      "complexity_density": 0.086,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 186,
+      "function_count": 13,
+      "total_cyclomatic": 16,
+      "total_cognitive": 3,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "ProfilePersistenceTests.luau",
+      "maintainability_index": 97.5,
+      "complexity_density": 0.0833,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 312,
+      "function_count": 23,
+      "total_cyclomatic": 26,
+      "total_cognitive": 3,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "TelemetryTests.luau",
+      "maintainability_index": 96.76,
+      "complexity_density": 0.1081,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 222,
+      "function_count": 19,
+      "total_cyclomatic": 24,
+      "total_cognitive": 5,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "VisualQualityTests.luau",
+      "maintainability_index": 97.41,
+      "complexity_density": 0.0862,
+      "dead_code_ratio": 0.0,
+      "fan_in": 0,
+      "fan_out": 0,
+      "lines": 116,
+      "function_count": 8,
+      "total_cyclomatic": 10,
+      "total_cognitive": 2,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    }
+  ],
+  "large_functions": [
+    {
+      "path": "SoloLayout.luau",
+      "name": "SoloLayout.calculate",
+      "line": 111,
+      "lines": 158
+    },
+    {
+      "path": "HandGenerator.luau",
+      "name": "HandGenerator.generate",
+      "line": 459,
+      "lines": 135
+    },
+    {
+      "path": "DeveloperTools.luau",
+      "name": "DeveloperTools.applyCommand",
+      "line": 230,
+      "lines": 102
+    },
+    {
+      "path": "SimulationHarness.luau",
+      "name": "SimulationHarness.run",
+      "line": 192,
+      "lines": 78
+    },
+    {
+      "path": "SoloLayout.luau",
+      "name": "SoloLayout.scoreCardLayout",
+      "line": 287,
+      "lines": 70
+    },
+    {
+      "path": "VisualTokens.luau",
+      "name": "VisualTokens.resolve",
+      "line": 382,
+      "lines": 62
+    }
+  ],
+  "vital_signs": {
+    "unit_size_profile": {
+      "low_risk": 75.72115384615384,
+      "medium_risk": 17.548076923076923,
+      "high_risk": 5.288461538461538,
+      "very_high_risk": 1.4423076923076923
+    },
+    "unit_interfacing_profile": {
+      "low_risk": 91.58653846153847,
+      "medium_risk": 8.173076923076923,
+      "high_risk": 0.0,
+      "very_high_risk": 0.2403846153846154
+    }
+  },
+  "_meta": {
+    "docs": "https://docs.fallow.tools/explanations/health",
+    "limitations": "Metrics are navigation hints, not evidence of a behavior defect. Coverage is static_estimated, not measured. Unresolved imports and heuristic dead-code detection can affect scores; verify candidates in source and tests.",
+    "metrics": {
+      "cognitive": {
+        "description": "Comprehension cost with nesting penalties (SonarSource model adapted to Luau).",
+        "interpretation": "0–7 easy; 8–15 moderate; 15+ hard. Default threshold 15.",
+        "name": "Cognitive complexity",
+        "range": "[0, ∞)"
+      },
+      "complexity_density": {
+        "description": "Total cyclomatic complexity / lines of code for the file.",
+        "interpretation": "<0.3 low; 0.3–1.0 moderate; >1.0 very dense.",
+        "name": "Complexity density",
+        "range": "[0, ∞)"
+      },
+      "crap": {
+        "description": "CC² × (1 − cov/100)³ + CC. Default coverage from test require graph (85% direct / 40% transitive / 0%).",
+        "interpretation": "<30 acceptable; 30–99 moderate; 100+ high.",
+        "name": "CRAP",
+        "range": "[0, ∞)"
+      },
+      "cyclomatic": {
+        "description": "1 + decision points (if/elseif, loops, and/or, Luau if-expressions). Every function is a unit, including nested local function.",
+        "interpretation": "1–10 simple; 11–20 moderate; 21–50 high; 50+ very high. Default threshold 20.",
+        "name": "Cyclomatic complexity",
+        "range": "[1, ∞)"
+      },
+      "hotspot_score": {
+        "description": "normalized_churn × normalized_density × 100. Churn uses 90-day half-life on commits.",
+        "interpretation": "higher = more risky; project-relative.",
+        "name": "Hotspot score",
+        "range": "[0, 100]"
+      },
+      "maintainability_index": {
+        "description": "100 - (density×30) - (dead_ratio×20) - min(ln(fan_out+1)×4, 15), clamped to [0,100].",
+        "interpretation": "higher is better; <40 poor, 40–70 moderate, >70 good",
+        "name": "Maintainability Index",
+        "range": "[0, 100]"
+      },
+      "target_priority": {
+        "description": "min(density,1)×30 + hotspot_boost×25 + dead_ratio×20 + min(fan_in/20,1)×15 + min(fan_out/30,1)×10",
+        "interpretation": "higher priority first.",
+        "name": "Refactoring target priority",
+        "range": "[0, 100]"
+      },
+      "unit_interfacing": {
+        "description": "Parameter-count bins: 0–2 low, 3–4 medium, 5–6 high, 7+ very high.",
+        "interpretation": "Prefer few parameters per function.",
+        "name": "SIG unit interfacing",
+        "range": "parameter bins"
+      },
+      "unit_size": {
+        "description": "Function length in lines. Bins: 1–15 low, 16–30 medium, 31–60 high, >60 very high.",
+        "interpretation": "Flag functions over 60 lines by default.",
+        "name": "SIG unit size",
+        "range": "LOC bins"
+      }
+    }
+  }
+}

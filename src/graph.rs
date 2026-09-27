@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use full_moon::ast::{Call, Expression, FunctionArgs, Prefix, Suffix};
 use full_moon::node::Node;
-use full_moon::visitors::Visitor;
 use full_moon::parse;
+use full_moon::visitors::Visitor;
 
 use crate::resolve::{resolve_require, ResolvedRequire};
 
@@ -60,8 +60,8 @@ pub fn build_require_graph(root: &Path, files: &[PathBuf]) -> Result<RequireGrap
             .get(&abs)
             .cloned()
             .unwrap_or_else(|| display_rel(root, &abs));
-        let source = std::fs::read_to_string(file)
-            .map_err(|e| format!("read {}: {e}", file.display()))?;
+        let source =
+            std::fs::read_to_string(file).map_err(|e| format!("read {}: {e}", file.display()))?;
         let ast = parse(&source).map_err(|errs| {
             format!(
                 "parse {}: {}",
@@ -133,9 +133,7 @@ pub fn build_require_graph(root: &Path, files: &[PathBuf]) -> Result<RequireGrap
         }
     }
 
-    edges.sort_by(|a, b| {
-        (&a.from, a.line, &a.specifier).cmp(&(&b.from, b.line, &b.specifier))
-    });
+    edges.sort_by(|a, b| (&a.from, a.line, &a.specifier).cmp(&(&b.from, b.line, &b.specifier)));
     unresolved.sort_by(|a, b| (&a.from, a.line, a.kind).cmp(&(&b.from, b.line, b.kind)));
 
     Ok(RequireGraph {
@@ -146,8 +144,10 @@ pub fn build_require_graph(root: &Path, files: &[PathBuf]) -> Result<RequireGrap
 }
 
 pub fn display_rel(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .unwrap_or(path)
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    path.strip_prefix(&root)
+        .unwrap_or(&path)
         .to_string_lossy()
         .replace('\\', "/")
 }
@@ -235,7 +235,7 @@ fn first_string_arg(args: &FunctionArgs) -> Option<String> {
     }
 }
 
-fn unquote(raw: &str) -> String {
+pub(crate) fn unquote(raw: &str) -> String {
     let t = raw.trim();
     if t.len() >= 2 {
         let bytes = t.as_bytes();
@@ -258,7 +258,8 @@ fn unquote(raw: &str) -> String {
                 });
                 if let Some(start) = inner_start {
                     if end > start {
-                        return t[start..end].to_string();
+                        let closing_len = start;
+                        return t[start..t.len() - closing_len].to_string();
                     }
                 }
             }
@@ -302,10 +303,7 @@ pub fn fan_counts(graph: &RequireGraph) -> BTreeMap<String, (usize, usize)> {
         .map(|f| {
             (
                 f.clone(),
-                (
-                    *fan_in.get(f).unwrap_or(&0),
-                    *fan_out.get(f).unwrap_or(&0),
-                ),
+                (*fan_in.get(f).unwrap_or(&0), *fan_out.get(f).unwrap_or(&0)),
             )
         })
         .collect()

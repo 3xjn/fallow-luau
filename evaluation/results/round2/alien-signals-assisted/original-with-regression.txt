@@ -1,0 +1,19 @@
+C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-assisted\tests\effect.spec:291: shouldPreserveEffectCallbackErrors
+[Stack Begin]
+    Script '[C]' - function 'assert'
+    Script 'C'
+    Script 'C'
+[Stack End]
+
+C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-assisted\tests\effect.spec:291: shouldPreserveEffectCallbackErrors
+stack traceback:
+	[C]: in function 'assert'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-assisted\tests\effect.spec:291: in function 'shouldPreserveEffectCallbackErrors'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-assisted\tests\effect.spec:315: in ?
+[Stack Begin]
+    Script '[C]'
+    Script '__mlua_async_poll', Line 27
+    Script '__mlua_require', Line 22
+    Script 'C'
+[Stack End]
+

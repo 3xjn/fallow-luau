@@ -8,13 +8,13 @@ use serde_json::{json, Value};
 
 use crate::audit::{analyze_audit, AuditOptions};
 use crate::dead_code::{analyze_dead_code, DeadCodeOptions};
-use crate::discover::discover_files;
+use crate::discover::discover_configured_files;
 use crate::dupes::{analyze_dupes, DupesOptions};
 use crate::explain::explain_rule;
 use crate::graph::build_require_graph;
+use crate::health::HealthOptions;
 use crate::project::{analyze_project, ProjectOptions};
 use crate::report::{list_report, schema_manifest};
-use crate::health::HealthOptions;
 
 pub fn run_mcp_stdio() -> Result<(), String> {
     let stdin = std::io::stdin();
@@ -46,10 +46,7 @@ pub fn run_mcp_stdio() -> Result<(), String> {
             })),
             "tools/list" => Ok(json!({ "tools": tool_defs() })),
             "tools/call" => {
-                let name = params
-                    .get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or("");
+                let name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
                 let args = params.get("arguments").cloned().unwrap_or(json!({}));
                 match call_tool(name, args) {
                     Ok(value) => Ok(json!({
@@ -62,7 +59,7 @@ pub fn run_mcp_stdio() -> Result<(), String> {
                     })),
                 }
             }
-            "ping" => Ok(json!({ })),
+            "ping" => Ok(json!({})),
             _ => Err(format!("method not found: {method}")),
         };
 
@@ -81,12 +78,24 @@ pub fn run_mcp_stdio() -> Result<(), String> {
 
 fn tool_defs() -> Vec<Value> {
     vec![
-        tool("schema", "Capability manifest (commands, issue types, parity status)"),
-        tool("list_project", "Discovered files and string-literal require graph"),
+        tool(
+            "schema",
+            "Capability manifest (commands, issue types, parity status)",
+        ),
+        tool(
+            "list_project",
+            "Discovered files and string-literal require graph",
+        ),
         tool("check_health", "Complexity, MI, hotspots, targets, score"),
-        tool("find_dead_code", "Unused files, returned keys, locals, types, cycles"),
+        tool(
+            "find_dead_code",
+            "Unused files, returned keys, locals, types, cycles",
+        ),
         tool("find_dupes", "Token/suffix-array clones across .lua/.luau"),
-        tool("audit", "Combined dead-code + health + dupes with pass/warn/fail"),
+        tool(
+            "audit",
+            "Combined dead-code + health + dupes with pass/warn/fail",
+        ),
         tool("explain", "Rule docs for one issue type id"),
         tool("inspect", "Compose evidence for one file or symbol"),
         tool("trace", "Callers/callees through the require graph"),
@@ -104,6 +113,7 @@ fn tool(name: &str, description: &str) -> Value {
                 "root": { "type": "string", "description": "Project root (default .)" },
                 "id": { "type": "string", "description": "Issue type id for explain" },
                 "changed_since": { "type": "string", "description": "Git ref for audit scoping" },
+                "gate": { "type": "string", "enum": ["new-only", "all"], "description": "Audit gate (default new-only with changed_since)" },
                 "path": { "type": "string", "description": "File path for inspect/trace" },
                 "symbol": { "type": "string", "description": "Returned key / function name" },
                 "key": { "type": "string", "description": "Module key for trace" },
@@ -119,17 +129,18 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
         "schema" => Ok(schema_manifest(true)),
         "list_project" => {
             let root = root.canonicalize().map_err(|e| e.to_string())?;
-            let files = discover_files(&root);
+            let files = discover_configured_files(&root)?;
             let graph = build_require_graph(&root, &files)?;
             Ok(list_report(&root.display().to_string(), &graph, true))
         }
         "check_health" => {
+            let config = crate::config::load_config(&root)?.config;
             let (_p, report) = analyze_project(
                 &root,
                 &ProjectOptions {
                     health: HealthOptions {
                         explain: true,
-                        ..HealthOptions::default()
+                        ..config.health_options()
                     },
                 },
             )?;
@@ -137,7 +148,7 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
         }
         "find_dead_code" => {
             let root = root.canonicalize().map_err(|e| e.to_string())?;
-            let files = discover_files(&root);
+            let files = discover_configured_files(&root)?;
             let graph = build_require_graph(&root, &files)?;
             let report = analyze_dead_code(
                 &root,
@@ -152,18 +163,28 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
         }
         "find_dupes" => {
             let root = root.canonicalize().map_err(|e| e.to_string())?;
-            let files = discover_files(&root);
+            let files = discover_configured_files(&root)?;
+            let config = crate::config::load_config(&root)?.config;
             let report = analyze_dupes(
                 &root,
                 &files,
                 &DupesOptions {
                     explain: true,
-                    ..DupesOptions::default()
+                    ..config.dupes_options()
                 },
             )?;
             Ok(serde_json::to_value(report).unwrap())
         }
         "audit" => {
+            let gate = match args
+                .get("gate")
+                .and_then(|g| g.as_str())
+                .unwrap_or("new-only")
+            {
+                "new-only" => crate::audit::AuditGate::NewOnly,
+                "all" => crate::audit::AuditGate::All,
+                value => return Err(format!("unknown audit gate: {value}")),
+            };
             let changed = args
                 .get("changed_since")
                 .and_then(|c| c.as_str())
@@ -173,7 +194,8 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
                 &AuditOptions {
                     explain: true,
                     changed_since: changed,
-                    ..AuditOptions::default()
+                    gate,
+                    ..AuditOptions::configured(&root)?
                 },
             )?;
             Ok(serde_json::to_value(report).unwrap())
@@ -204,40 +226,18 @@ fn call_tool(name: &str, args: Value) -> Result<Value, String> {
 }
 
 fn read_message(reader: &mut impl BufRead) -> Result<Option<Value>, String> {
-    let mut headers = String::new();
-    loop {
-        let mut line = String::new();
-        let n = reader.read_line(&mut line).map_err(|e| e.to_string())?;
-        if n == 0 {
-            return Ok(None);
-        }
-        if line == "\r\n" || line == "\n" {
-            break;
-        }
-        headers.push_str(&line);
+    let mut line = String::new();
+    if reader.read_line(&mut line).map_err(|e| e.to_string())? == 0 {
+        return Ok(None);
     }
-    let mut content_length = None;
-    for line in headers.lines() {
-        let lower = line.to_ascii_lowercase();
-        if let Some(rest) = lower.strip_prefix("content-length:") {
-            content_length = Some(
-                rest.trim()
-                    .parse::<usize>()
-                    .map_err(|e| format!("bad content-length: {e}"))?,
-            );
-        }
-    }
-    let len = content_length.ok_or_else(|| "missing Content-Length".to_string())?;
-    let mut buf = vec![0u8; len];
-    reader.read_exact(&mut buf).map_err(|e| e.to_string())?;
-    let v: Value = serde_json::from_slice(&buf).map_err(|e| e.to_string())?;
+    let v: Value = serde_json::from_str(&line).map_err(|e| e.to_string())?;
     Ok(Some(v))
 }
 
 fn write_message(out: &mut impl Write, value: &Value) -> Result<(), String> {
     let body = serde_json::to_vec(value).map_err(|e| e.to_string())?;
-    write!(out, "Content-Length: {}\r\n\r\n", body.len()).map_err(|e| e.to_string())?;
     out.write_all(&body).map_err(|e| e.to_string())?;
+    out.write_all(b"\n").map_err(|e| e.to_string())?;
     out.flush().map_err(|e| e.to_string())?;
     Ok(())
 }

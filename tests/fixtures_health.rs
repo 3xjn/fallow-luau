@@ -37,7 +37,9 @@ fn require_graph_resolves_string_literals() {
     let resolved = graph
         .edges
         .iter()
-        .find(|e| e.from.ends_with("main.luau") && e.to.as_deref().is_some_and(|t| t.contains("util")))
+        .find(|e| {
+            e.from.ends_with("main.luau") && e.to.as_deref().is_some_and(|t| t.contains("util"))
+        })
         .expect("main -> util edge");
     assert_eq!(resolved.kind, RequireKind::StringLiteral);
 }
@@ -156,8 +158,8 @@ fn density_and_mi_on_dense_fixture() {
         "density={}",
         score.complexity_density
     );
-    // MI = 100 - density*30 - 0 - fan_out_penalty(0)
-    let expected = 100.0 - score.complexity_density * 30.0;
+    // Current Fallow dampens density for files shorter than 50 lines.
+    let expected = 100.0 - score.complexity_density * 30.0 * (score.lines as f64 / 50.0).min(1.0);
     assert!(
         (score.maintainability_index - expected).abs() < 0.05,
         "mi={} expected~{}",

@@ -35,16 +35,34 @@ struct Rule {
 }
 
 const RULES: &[(&str, Rule)] = &[
+    ("boundary-violation", Rule {
+        name: "Architecture boundary violation",
+        description: "A resolved require crosses configured zones in a forbidden direction.",
+        action: "Check the dependency direction; move shared behavior or explicitly allow the dependency in boundaries.",
+        docs: "https://fallow.tools/docs/configuration/boundaries/",
+    }),
+    ("high-crap", Rule {
+        name: "Untested complexity risk",
+        description: "CC squared times uncovered fraction cubed plus CC reaches max_crap (default 30). Coverage is statically estimated.",
+        action: "Inspect existing tests, add behavioral coverage, then simplify the risky function if justified.",
+        docs: "https://fallow.tools/docs/explanations/health/#untested-complexity-risk",
+    }),
+    ("large-function", Rule {
+        name: "Large function",
+        description: "Function exceeds max_unit_size (default 60 lines). Raw size profiles still include suppressed findings.",
+        action: "Inspect responsibilities and extract cohesive helpers with regression coverage when useful.",
+        docs: "https://fallow.tools/docs/explanations/health/#risk-profiles",
+    }),
     ("unused-file", Rule {
         name: "Unused file",
         description: "File is not reachable from any entry point via string-literal require edges.",
-        action: "Delete the file or add it as an entry point.",
+        action: "Verify runtime consumers and unresolved imports before deleting; configure public entry points when appropriate.",
         docs: "https://docs.fallow.tools/explanations/dead-code#unused-files",
     }),
     ("unused-export", Rule {
         name: "Unused returned key",
         description: "Key on a returned module table is never referenced by another module.",
-        action: "Remove the key or start using it.",
+        action: "Verify consumers, dynamic access and public API contracts before removing the key.",
         docs: "https://docs.fallow.tools/explanations/dead-code#unused-exports",
     }),
     ("unused-local", Rule {

@@ -1,0 +1,29 @@
+diff --git a/tests/untrack.spec.luau b/tests/untrack.spec.luau
+index 7e11b5c..90ad7b2 100644
+--- a/tests/untrack.spec.luau
++++ b/tests/untrack.spec.luau
+@@ -28,4 +28,24 @@ end
+ 
+ shouldPauseTracking()
+ 
++local function shouldKeepTrackingPausedUntilEveryNestedPauseIsResumed()
++	local src, setSrc = signal(0)
++	local runs = 0
++	local c = computed(function()
++		runs += 1
++		pauseTracking()
++		pauseTracking()
++		resumeTracking()
++		local value = src()
++		resumeTracking()
++		return value
++	end)
++
++	assert(c() == 0, getFunctionName())
++	setSrc(1)
++	assert(c() == 0 and runs == 1, getFunctionName())
++end
++
++shouldKeepTrackingPausedUntilEveryNestedPauseIsResumed()
++
+ return {}

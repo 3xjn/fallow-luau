@@ -1,0 +1,28 @@
+diff --git a/tests/FlagCache.spec.luau b/tests/FlagCache.spec.luau
+index 59e01ca..0537da1 100644
+--- a/tests/FlagCache.spec.luau
++++ b/tests/FlagCache.spec.luau
+@@ -71,4 +71,23 @@ h.test("FlagCache: non-empty quotaLimited clears all flags", function()
+     h.expectEqual(store.requestId, "req-3", "request metadata still updated")
+ end)
+ 
++h.test("FlagCache: a fresh response removes flags absent from the reload", function()
++    local store = FlagCache.empty()
++    FlagCache.applyResponse(store, {
++        flags = {
++            old = {
++                enabled = true,
++                metadata = { id = 42, payload = { color = "red" } },
++            },
++        },
++    })
++    h.expectEqual(FlagCache.getValue(store, "old"), true)
++
++    FlagCache.applyResponse(store, { featureFlags = { new = true } })
++    h.expectNil(FlagCache.getValue(store, "old"), "removed flag must not remain enabled")
++    h.expectNil(FlagCache.getPayload(store, "old"), "removed flag payload must not remain")
++    h.expectNil(FlagCache.getDetails(store, "old"), "removed flag details must not remain")
++    h.expectEqual(FlagCache.getValue(store, "new"), true)
++end)
++
+ return true

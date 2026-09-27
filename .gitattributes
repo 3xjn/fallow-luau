@@ -1,0 +1,3 @@
+# Preserve frozen experiment prompts, patches, logs and manifests byte-for-byte.
+# Patch context indentation and captured output are evidence, not source formatting.
+evaluation/** -text -whitespace

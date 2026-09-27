@@ -108,6 +108,9 @@ jobs:
         shell: bash
         run: cargo build --release --target "${{ matrix.target }}" --bin fallow-luau
 
+      - name: Test
+        run: cargo test --locked
+
       - name: Package
         shell: bash
         env:

@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 pub fn health_meta() -> Value {
     json!({
         "docs": "https://docs.fallow.tools/explanations/health",
+        "limitations": "Metrics are navigation hints, not evidence of a behavior defect. Coverage is static_estimated, not measured. Unresolved imports and heuristic dead-code detection can affect scores; verify candidates in source and tests.",
         "metrics": {
             "cyclomatic": {
                 "name": "Cyclomatic complexity",
@@ -25,7 +26,7 @@ pub fn health_meta() -> Value {
             },
             "maintainability_index": {
                 "name": "Maintainability Index",
-                "description": "100 - (density×30) - (dead_ratio×20) - min(ln(fan_out+1)×4, 15), clamped to [0,100].",
+                "description": "100 - density×30×min(lines/50,1) - dead_ratio×20 - min(ln(fan_out+1)×4,15), clamped to [0,100].",
                 "range": "[0, 100]",
                 "interpretation": "higher is better; <40 poor, 40–70 moderate, >70 good"
             },
@@ -55,9 +56,9 @@ pub fn health_meta() -> Value {
             },
             "target_priority": {
                 "name": "Refactoring target priority",
-                "description": "min(density,1)×30 + hotspot_boost×25 + dead_ratio×20 + min(fan_in/20,1)×15 + min(fan_out/30,1)×10",
+                "description": "min(density,1)×30 + hotspot_boost×25 + dead_ratio×20 + min(fan_in/P95_fan_in,1)×15 + min(fan_out/P95_fan_out,1)×10; P95 floors 5 and 8.",
                 "range": "[0, 100]",
-                "interpretation": "higher priority first."
+                "interpretation": "Sort by efficiency = priority / effort (low=1, medium=2, high=3). Evidence includes functions, unused exports, cycles, callers and clone siblings."
             }
         }
     })
@@ -74,12 +75,14 @@ pub fn schema_meta() -> Value {
 pub fn dead_code_meta() -> Value {
     json!({
         "docs": "https://docs.fallow.tools/explanations/dead-code",
+        "limitations": "Candidates only. Unresolved imports, module escapes, lexical shadowing and indirect key access are not fully modeled. Do not delete code without independently checking its consumers and tests. Entry-module exports and exported types are retained.",
         "parity": "docs/parity.md",
         "issue_types": {
             "unused_file": "Unreachable from entry points (init/main + tests; fan-in=0 library roots when no init).",
             "unused_export": "Returned module-table key never referenced via require binding.",
             "unused_local": "Local binding never read (nested functions included).",
-            "circular_dependency": "Require-graph SCC with no depth limit."
+            "circular_dependency": "Require-graph SCC with a closed walk following actual edges and no depth limit.",
+            "boundary_violation": "Resolved import crosses configured zones without permission."
         }
     })
 }

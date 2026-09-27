@@ -1,0 +1,79 @@
+PostHog Roblox SDK - unit tests
+
+  ok   Uuid: format, version, and variant nibbles
+  ok   Uuid: timestamp is encoded big-endian in the prefix
+  ok   Uuid: monotonic counter within the same millisecond
+  ok   Uuid: later timestamps sort after earlier ones
+  ok   RetryPolicy: 2xx is success
+  ok   RetryPolicy: network error and 3xx/5xx retry
+  ok   RetryPolicy: 413 retries with a smaller batch
+  ok   RetryPolicy: other 4xx are dropped
+  ok   FlagCache: v3 boolean, variant, and payload
+  ok   FlagCache: v4 overrides v3 and records details
+  ok   FlagCache: v4 enabled boolean without a variant
+  ok   FlagCache: non-empty quotaLimited clears all flags
+  FAIL FlagCache: ordinary response replaces prior flags, payloads, and details
+       C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-posthog-roblox-assisted\tests\FlagCache.spec:84: expected nil, got true
+  FAIL FeatureFlags: stale successful reload cannot overwrite newer success
+       C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-posthog-roblox-assisted\tests\FeatureFlags.spec:58: values differ
+      expected: new
+      actual:   old
+  FAIL FeatureFlags: failed newer reload leaves prior cache and rejects older response
+       C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-posthog-roblox-assisted\tests\FeatureFlags.spec:81: expected false, got true
+  FAIL Server Group passes provided group properties into flags request
+       C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-posthog-roblox-assisted\tests\ServerGroup.spec:108: attempt to index nil with 'guild'
+  ok   ExceptionBuilder: parses the common Source:line function form
+  ok   ExceptionBuilder: parses the legacy Script '...' form and skips markers
+  ok   ExceptionBuilder: builds an unhandled exception payload
+  ok   ExceptionBuilder: handled exceptions use the generic mechanism
+  ok   ExceptionBuilder: build honors a custom exception type
+  ok   ExceptionBuilder: normalize accepts strings, tables, and other values
+  ok   EventQueue: delivers and empties on success
+  ok   EventQueue: splits into batches of maxBatchSize
+  ok   EventQueue: retains events and pauses on 500
+  ok   EventQueue: drops events on a non-retryable 400
+  ok   EventQueue: halves the batch size on 413
+  ok   EventQueue: drops the oldest event when over capacity
+  ok   EventQueue: shouldFlush reflects the flushAt threshold
+  ok   EventQueue: clear empties the queue
+  FAIL EventQueue: success removes only sent events after overflow during send
+       C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-posthog-roblox-assisted\tests\EventQueue.spec:188: values differ
+      expected: { 1=a, 2=b, 3=c }
+      actual:   { 1=a, 2=b }
+  FAIL EventQueue: drop response preserves newer event after overflow
+       C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-posthog-roblox-assisted\tests\EventQueue.spec:211: values differ
+      expected: { 1=a, 2=b, 3=c }
+      actual:   { 1=a, 2=b }
+  ok   EventQueue: retry retains surviving events within capacity
+  FAIL EventQueue: clear during send leaves only later captures
+       C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-posthog-roblox-assisted\tests\EventQueue.spec:263: values differ
+      expected: { 1=a, 2=b, 3=c }
+      actual:   { 1=a, 2=b }
+  ok   Sanitize: passes scalars through unchanged
+  ok   Sanitize: NaN and infinities become strings
+  ok   Sanitize: drops functions
+  ok   Sanitize: recurses into nested tables and arrays
+  ok   Sanitize: breaks cyclic references
+  ok   Defaults: requires a non-empty projectKey
+  ok   Defaults: accepts apiKey as a deprecated alias for projectKey
+  ok   Defaults: accepts enableClientRelay as a deprecated alias
+  ok   Defaults: applies defaults for omitted options
+  ok   Defaults: respects explicit overrides
+  ok   Defaults: strips trailing slashes from host
+  ok   Defaults: rejects out-of-range numeric options
+  ok   Logger: new resolves the level and defaults to warn
+  ok   Logger: setLevel updates the level and ignores unknown levels
+  ok   Logger: level methods are callable
+  ok   Session: create uses the uuid generator and start time
+  ok   Session: round-trips through teleport data
+  ok   Session: fromTeleportData rejects missing or malformed data
+  ok   PlayerState: new initializes a player subject
+  ok   PlayerState: new marks the server pseudo-subject
+  ok   PlayerState: setGroup and groupsOrNil
+  ok   MemoryStorage: set, get, and remove
+
+49 passed, 7 failed, 56 total
+
+Function coverage: 39/39 (100.0%)
+
+FAILED: one or more tests failed

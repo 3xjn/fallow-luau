@@ -1,0 +1,25 @@
+C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src:52: attempt to call a string value
+[Stack Begin]
+    Script 'C'
+    Script 'C'
+    Script 'C'
+    Script 'C'
+    Script 'C'
+    Script 'C'
+[Stack End]
+
+C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src:52: attempt to call a string value
+stack traceback:
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src:52: in function 'notifyEffect'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src:100: in function 'notify'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src\system:394: in function 'processEffectNotifications'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\src:145: in function 'setter'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\tests\effect.spec:296: in function 'shouldDisposeEffectWhenInitialRunFails'
+	C:\Users\asher\Documents\ChatGPT\fallow-luau\target\evaluation\round2\replay-alien-signals-control\tests\effect.spec:353: in ?
+[Stack Begin]
+    Script '[C]'
+    Script '__mlua_async_poll', Line 27
+    Script '__mlua_require', Line 22
+    Script 'C'
+[Stack End]
+

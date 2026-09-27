@@ -1,0 +1,13 @@
+valid 8x8 grid: true
+fractional coordinate accepted: true { } 64
+NaN coordinate accepted: true { } 64
+first request at uptime 0.1 accepted: false
+same request at uptime 0.6 accepted: true
+future profile load status: future {
+    coins = 20,
+    fulfilledPurchaseIds = { },
+    futureField = "keep",
+    redeemedCodes = { },
+    version = 3,
+} 3
+concurrent future profile rewritten as version: 2 future field: nil

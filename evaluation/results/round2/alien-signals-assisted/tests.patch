@@ -1,0 +1,86 @@
+diff --git a/tests/effect.spec.luau b/tests/effect.spec.luau
+index 9d55560..e4abc55 100644
+--- a/tests/effect.spec.luau
++++ b/tests/effect.spec.luau
+@@ -282,6 +282,26 @@ local function shouldHandleFlagsAreIndirectlyUpdatedDuringCheckDirty()
+ 	assert(triggers == 2, getFunctionName())
+ end
+ 
++local function shouldPreserveEffectCallbackErrors()
++	local success, err = pcall(function()
++		effect(function()
++			error("initial effect failure")
++		end)
++	end)
++	assert(not success and string.find(tostring(err), "initial effect failure", 1, true), getFunctionName())
++
++	local value, setValue = signal(0)
++	effect(function()
++		if value() == 1 then
++			error("rerun effect failure")
++		end
++	end)
++	success, err = pcall(function()
++		setValue(1)
++	end)
++	assert(not success and string.find(tostring(err), "rerun effect failure", 1, true), getFunctionName())
++end
++
+ shouldClearSubscriptionsWhenUntrackedByAllSubscribers()
+ shouldNotRunUntrackedInnerEffect()
+ shouldRunOuterEffectFirst()
+@@ -292,5 +312,6 @@ shouldCustomEffectSupportBatch()
+ shouldDuplicateSubscribersDoNotAffectTheNotifyOrder()
+ shouldHandleSideEffectWithInnerEffects()
+ shouldHandleFlagsAreIndirectlyUpdatedDuringCheckDirty()
++shouldPreserveEffectCallbackErrors()
+ 
+ return {}
+diff --git a/tests/effectScope.spec.luau b/tests/effectScope.spec.luau
+index a748cda..578f9ac 100644
+--- a/tests/effectScope.spec.luau
++++ b/tests/effectScope.spec.luau
+@@ -32,6 +32,16 @@ local function shouldNotTriggerAfterStop()
+ 	assert(triggers == 3, getFunctionName())
+ end
+ 
++local function shouldPreserveScopeCallbackError()
++	local success, err = pcall(function()
++		effectScope(function()
++			error("scope failure")
++		end)
++	end)
++	assert(not success and string.find(tostring(err), "scope failure", 1, true), getFunctionName())
++end
++
+ shouldNotTriggerAfterStop()
++shouldPreserveScopeCallbackError()
+ 
+ return {}
+diff --git a/tests/untrack.spec.luau b/tests/untrack.spec.luau
+index 7e11b5c..0b46a98 100644
+--- a/tests/untrack.spec.luau
++++ b/tests/untrack.spec.luau
+@@ -26,6 +26,22 @@ local function shouldPauseTracking()
+ 	assert(c() == 0, getFunctionName())
+ end
+ 
++local function shouldKeepNestedPauseActiveUntilBothResumes()
++	local src, setSrc = signal(0)
++	local runs = 0
++	signals.effect(function()
++		runs += 1
++		pauseTracking()
++		pauseTracking()
++		resumeTracking()
++		src()
++		resumeTracking()
++	end)
++	setSrc(1)
++	assert(runs == 1, getFunctionName())
++end
++
+ shouldPauseTracking()
++shouldKeepNestedPauseActiveUntilBothResumes()
+ 
+ return {}
